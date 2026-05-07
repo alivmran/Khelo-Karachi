@@ -74,7 +74,12 @@ const Requests = () => {
                       <div key={req._id} className="card">
                           <div className="card-header">
                               <h3>⚔️ Challenge Received</h3>
-                              <span className="badge" style={{background:'rgba(250, 204, 21, 0.2)', color:'#facc15'}}>Pending</span>
+                              <span className={`badge`} style={{
+                                  background: req.status === 'ACCEPTED' ? 'rgba(16, 185, 129, 0.2)' : req.status === 'REJECTED' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(250, 204, 21, 0.2)',
+                                  color: req.status === 'ACCEPTED' ? '#34d399' : req.status === 'REJECTED' ? '#f87171' : '#facc15'
+                              }}>
+                                  {req.status || 'PENDING'}
+                              </span>
                           </div>
                           <div className="card-body">
                               <p style={{margin:0, color:'white'}}><strong>{req.sender.name}</strong> challenged your team.</p>
@@ -86,8 +91,12 @@ const Requests = () => {
                               </p>
                           </div>
                           <div className="card-footer" style={{display:'flex', gap:'10px', padding:'15px'}}>
-                              <button onClick={() => handleResponse(req._id, 'ACCEPTED')} style={{flex:1, background:'#10b981', color:'white', border:'none', padding:'10px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Accept</button>
-                              <button onClick={() => handleResponse(req._id, 'REJECTED')} style={{flex:1, background:'rgba(239, 68, 68, 0.2)', color:'#ef4444', border:'none', padding:'10px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Reject</button>
+                              {(!req.status || req.status === 'PENDING') && (
+                                <>
+                                  <button onClick={() => handleResponse(req._id, 'ACCEPTED')} style={{flex:1, background:'#10b981', color:'white', border:'none', padding:'10px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Accept</button>
+                                  <button onClick={() => handleResponse(req._id, 'REJECTED')} style={{flex:1, background:'rgba(239, 68, 68, 0.2)', color:'#ef4444', border:'none', padding:'10px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Reject</button>
+                                </>
+                              )}
                               {req.status === 'ACCEPTED' && (
                                 <button onClick={() => handleCancel(req._id)} style={{flex:1, background:'rgba(251,191,36,0.18)', color:'#fbbf24', border:'none', padding:'10px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Cancel Match</button>
                               )}

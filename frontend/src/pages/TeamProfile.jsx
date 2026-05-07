@@ -16,6 +16,10 @@ const TeamProfile = () => {
     refundContactNumber: ''
   });
   
+  const [paymentModalBooking, setPaymentModalBooking] = useState(null);
+  const [senderName, setSenderName] = useState('');
+  const [transactionIdShort, setTransactionIdShort] = useState('');
+  
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -29,6 +33,8 @@ const TeamProfile = () => {
       }
     };
     fetchData();
+    window.addEventListener('refreshBookings', fetchData);
+    return () => window.removeEventListener('refreshBookings', fetchData);
   }, []);
 
   const allMatches = [
@@ -80,6 +86,17 @@ const TeamProfile = () => {
     }
   };
 
+  const handleAcceptRefund = async (bookingId) => {
+    try {
+      await API.put(`/bookings/${bookingId}/verify-refund`, { received: true });
+      toast.success('Refund accepted successfully.');
+      const bookingRes = await API.get('/bookings/mybookings');
+      setBookings(bookingRes.data);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to accept refund.');
+    }
+  };
+
   const refundPendingCount = visibleBookings.filter((b) => b.status === 'Awaiting Refund Details').length;
 
   const openRefundModal = (booking) => {
@@ -102,6 +119,31 @@ const TeamProfile = () => {
       setBookings(bookingRes.data);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to submit refund details');
+    }
+  };
+
+  const handleSubmitPaymentProof = async () => {
+    if (!senderName.trim()) {
+      toast.error('Please enter sender account name');
+      return;
+    }
+    if (!/^\d{4}$/.test(transactionIdShort)) {
+      toast.error('Please enter exactly 4 digits for TID');
+      return;
+    }
+    try {
+      await API.put(`/bookings/${paymentModalBooking._id}/submit-payment-proof`, {
+        senderName,
+        transactionIdShort
+      });
+      toast.success('Payment proof submitted.');
+      setPaymentModalBooking(null);
+      setSenderName('');
+      setTransactionIdShort('');
+      const bookingRes = await API.get('/bookings/mybookings');
+      setBookings(bookingRes.data);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to submit payment proof');
     }
   };
 
@@ -142,15 +184,23 @@ const TeamProfile = () => {
                                 Cancel Request
                             </button>
                         )}
+                        {b.status === 'Awaiting Payment' && (
+                            <button onClick={() => setPaymentModalBooking(b)} style={{marginTop:'10px', width:'100%', background:'rgba(59, 130, 246, 0.15)', color:'#60a5fa', border:'1px solid rgba(59, 130, 246, 0.4)', padding:'8px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>
+                                Submit Payment Proof
+                            </button>
+                        )}
                         {b.status === 'Refund Claimed' && (
                           <div style={{marginTop:'12px', display:'grid', gap:'8px'}}>
                             <div style={{fontSize:'0.84rem', color:'#ddd'}}>Manager marked refund sent (TID: {b.refundTransactionId || '-'}).</div>
+                            <button onClick={() => handleAcceptRefund(b._id)} style={{width:'100%', background:'rgba(16, 185, 129, 0.15)', color:'#34d399', border:'1px solid rgba(16, 185, 129, 0.4)', padding:'8px', borderRadius:'6px', cursor:'pointer', fontWeight:'700'}}>
+                              Confirm Refund Received
+                            </button>
                             <textarea
                               placeholder="Enter dispute reason if refund not received"
                               value={disputeReasonByBooking[b._id] || ''}
                               onChange={(e) => setDisputeReasonByBooking({ ...disputeReasonByBooking, [b._id]: e.target.value })}
-                              rows={4}
-                              style={{width:'100%', padding:'10px', borderRadius:'8px', background:'#111827', border:'1px solid #475569', color:'#fff'}}
+                              rows={2}
+                              style={{width:'100%', padding:'10px', borderRadius:'8px', background:'#111827', border:'1px solid #475569', color:'#fff', marginTop: '10px'}}
                             />
                             <button onClick={() => handleDisputeRefund(b._id)} style={{width:'100%', background:'rgba(239, 68, 68, 0.14)', color:'#fca5a5', border:'1px solid rgba(239, 68, 68, 0.4)', padding:'8px', borderRadius:'6px', cursor:'pointer', fontWeight:'700'}}>
                               Dispute Refund
@@ -164,7 +214,7 @@ const TeamProfile = () => {
                         )}
                         {b.status === 'Disputed' && (
                           <div style={{marginTop:'12px', padding:'10px', border:'1px solid rgba(239,68,68,0.45)', background:'rgba(239,68,68,0.1)', borderRadius:'8px', color:'#fca5a5', fontWeight:'600'}}>
-                            Dispute submitted. Khello support will contact you within 24 hours.
+                            Dispute submitted. Khelo support will contact you within 24 hours.
                           </div>
                         )}
                     </div>
@@ -246,6 +296,26 @@ const TeamProfile = () => {
             <div className="modal-actions">
               <button className="confirm-btn" onClick={submitRefundDetails}>Confirm Refund Details</button>
               <button className="cancel-btn" onClick={() => setRefundModalBooking(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {paymentModalBooking && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3 style={{marginBottom:'10px'}}>Submit Payment Proof</h3>
+            <p style={{color:'#ccc', marginBottom:'12px'}}>Submit proof to continue for manager approval.</p>
+            <div className="form-group">
+              <label>Sender Account Name</label>
+              <input value={senderName} onChange={e => setSenderName(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>Last 4 Digits of TID</label>
+              <input value={transactionIdShort} onChange={e => setTransactionIdShort(e.target.value.replace(/\D/g, '').slice(0, 4))} maxLength="4" pattern="\d{4}" title="Please enter exactly 4 numbers" />
+            </div>
+            <div className="modal-actions">
+              <button className="confirm-btn" onClick={handleSubmitPaymentProof}>Submit Payment Proof</button>
+              <button className="cancel-btn" onClick={() => setPaymentModalBooking(null)}>Close</button>
             </div>
           </div>
         </div>

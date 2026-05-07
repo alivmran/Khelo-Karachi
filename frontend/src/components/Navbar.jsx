@@ -35,6 +35,10 @@ const Navbar = () => {
         toast.info(notification.message);
       });
       
+      socket.on('refreshBookings', () => {
+        window.dispatchEvent(new Event('refreshBookings'));
+      });
+      
       return () => socket.disconnect();
     }
   }, [user]);
@@ -84,9 +88,28 @@ const Navbar = () => {
 
   return (
     <nav className="navbar">
-      <div className="logo-container" onClick={goHome}>
-        <img src="/Artboard1.png" alt="Logo" className="logo-img" />
-        <span className="logo-text">Khello Karachi</span>
+      <div 
+        onClick={goHome} 
+        style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          cursor: 'pointer',
+          height: '100%'
+        }}
+      >
+        <img 
+          src="/khelo-logo.png" 
+          alt="Khelo Karachi Logo" 
+          style={{ 
+            height: '60px', 
+            width: 'auto', 
+            objectFit: 'contain', 
+            display: 'block',
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            padding: '4px'
+          }} 
+        />
       </div>
       
       <div className="links">

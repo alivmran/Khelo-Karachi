@@ -55,6 +55,20 @@ app.set('userSockets', userSockets);
 app.use(cors());
 app.use(express.json()); 
 
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+      if (req.originalUrl.includes('/api/bookings') || req.originalUrl.includes('/api/matches')) {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          const io = req.app.get('io');
+          if (io) io.emit('refreshBookings');
+        }
+      }
+    }
+  });
+  next();
+});
+
 app.use('/api/users', authRoutes);
 app.use('/api/manager', managerRoutes);
 app.use('/api/admin', adminRoutes);

@@ -106,6 +106,20 @@ router.put('/booking/:id', protect, manager, async (req, res, next) => {
 
     booking.status = status === 'Rejected' ? 'Awaiting Refund Details' : status;
     await booking.save();
+
+    const Notification = require('../models/Notification');
+    const notif = new Notification({
+      recipient: booking.user,
+      message: `Your booking for ${court.name} was ${status}.`,
+      type: 'booking'
+    });
+    await notif.save();
+    const io = req.app.get('io');
+    const userSockets = req.app.get('userSockets');
+    if (io && userSockets && userSockets.has(booking.user.toString())) {
+      io.to(userSockets.get(booking.user.toString())).emit('newNotification', notif);
+    }
+
     res.json(booking);
   } catch (error) {
     next(error);

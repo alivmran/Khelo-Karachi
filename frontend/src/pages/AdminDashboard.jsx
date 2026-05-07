@@ -24,7 +24,11 @@ const AdminDashboard = () => {
     } catch (error) { toast.error('Failed to load admin data'); }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { 
+    fetchData(); 
+    window.addEventListener('refreshBookings', fetchData);
+    return () => window.removeEventListener('refreshBookings', fetchData);
+  }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();

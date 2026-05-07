@@ -225,6 +225,22 @@ router.put('/:id/submit-payment-proof', protect, async (req, res, next) => {
     booking.advancePaid = booking.court?.advanceRequired || 0;
     booking.status = 'Pending';
     const updatedBooking = await booking.save();
+
+    const Notification = require('../models/Notification');
+    if (booking.court && booking.court.manager) {
+      const notif = new Notification({
+        recipient: booking.court.manager,
+        message: `New payment proof submitted for booking at ${booking.court.name}. Action required.`,
+        type: 'booking'
+      });
+      await notif.save();
+      const io = req.app.get('io');
+      const userSockets = req.app.get('userSockets');
+      if (io && userSockets && userSockets.has(booking.court.manager.toString())) {
+        io.to(userSockets.get(booking.court.manager.toString())).emit('newNotification', notif);
+      }
+    }
+
     res.json(updatedBooking);
   } catch (error) {
     next(error);

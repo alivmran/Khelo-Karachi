@@ -28,6 +28,8 @@ const ManagerDashboard = () => {
       } catch (error) { toast.error('Failed to load dashboard'); }
     };
     fetchStats();
+    window.addEventListener('refreshBookings', fetchStats);
+    return () => window.removeEventListener('refreshBookings', fetchStats);
   }, []);
 
   useEffect(() => {
@@ -225,7 +227,7 @@ const ManagerDashboard = () => {
 
                   {b.status === 'Disputed' && (
                     <div style={{marginTop:'12px', color:'#fca5a5', background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.45)', borderRadius:'8px', padding:'10px'}}>
-                      User reported missing funds. Khello Support will contact you via email.
+                      User reported missing funds. Khelo Support will contact you via email.
                     </div>
                   )}
                 </div>

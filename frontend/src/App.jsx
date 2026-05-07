@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Landing from './pages/Landing';
@@ -17,30 +17,39 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 
+const ContainerLayout = () => (
+  <div className="container main-content">
+    <Outlet />
+  </div>
+);
+
 function App() {
   return (
     <div className="app-wrapper">
       <Navbar />
-      <div className="container main-content">
+      <div className="main-content-wrapper" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
           
-          <Route path="/courts" element={<Courts />} />
-          <Route path="/courts/:id" element={<CourtDetails />} />
+          <Route element={<ContainerLayout />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            
+            <Route path="/courts" element={<Courts />} />
+            <Route path="/courts/:id" element={<CourtDetails />} />
 
-          {/* User Routes */}
-          <Route path="/profile" element={<ProtectedRoute><TeamProfile /></ProtectedRoute>} />
-          <Route path="/find-team" element={<ProtectedRoute><FindTeam /></ProtectedRoute>} />
-          <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
-          
-          {/* Manager Route */}
-          <Route path="/manager/dashboard" element={<ProtectedRoute><ManagerDashboard /></ProtectedRoute>} />
-          <Route path="/manager/bookings" element={<ProtectedRoute><AdminBookings /></ProtectedRoute>} /> {/* Re-using booking table for managers */}
+            {/* User Routes */}
+            <Route path="/profile" element={<ProtectedRoute><TeamProfile /></ProtectedRoute>} />
+            <Route path="/find-team" element={<ProtectedRoute><FindTeam /></ProtectedRoute>} />
+            <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
+            
+            {/* Manager Route */}
+            <Route path="/manager/dashboard" element={<ProtectedRoute><ManagerDashboard /></ProtectedRoute>} />
+            <Route path="/manager/bookings" element={<ProtectedRoute><AdminBookings /></ProtectedRoute>} />
 
-          {/* Super Admin Route */}
-          <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+            {/* Super Admin Route */}
+            <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+          </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

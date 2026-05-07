@@ -51,6 +51,29 @@ const CourtDetails = () => {
   const [court, setCourt] = useState(null);
   const [activeImage, setActiveImage] = useState(null);
   
+  // --- SLIDER LOGIC ---
+  const nextImage = () => {
+    if (!court?.images?.length) return;
+    setActiveImage(prev => {
+      const idx = court.images.indexOf(prev);
+      return court.images[(idx + 1) % court.images.length];
+    });
+  };
+
+  const prevImage = () => {
+    if (!court?.images?.length) return;
+    setActiveImage(prev => {
+      const idx = court.images.indexOf(prev);
+      return court.images[(idx - 1 + court.images.length) % court.images.length];
+    });
+  };
+
+  useEffect(() => {
+    if (!court || !court.images || court.images.length <= 1) return;
+    const interval = setInterval(nextImage, 7000);
+    return () => clearInterval(interval);
+  }, [court, activeImage]);
+  
   const [date, setDate] = useState('');
   const [facility, setFacility] = useState('');
   const [selectedSlots, setSelectedSlots] = useState([]);
@@ -190,29 +213,40 @@ const CourtDetails = () => {
         
         <div className="details-layout">
           <div className="left-column">
-            <div className="gallery-box" style={{marginBottom:'0'}}>
-                {activeImage ? <img src={activeImage} className="main-image"/> : <div className="placeholder-large">No Image</div>}
+            <div className="gallery-box" style={{marginBottom:'20px', position: 'relative'}}>
+                {activeImage ? (
+                  <>
+                    <img src={activeImage} className="main-image" style={{ transition: 'opacity 0.3s ease-in-out' }} />
+                    {court.images && court.images.length > 1 && (
+                      <>
+                        <button onClick={(e) => { e.preventDefault(); prevImage(); }} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>❮</button>
+                        <button onClick={(e) => { e.preventDefault(); nextImage(); }} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>❯</button>
+                        <div style={{ position: 'absolute', bottom: '15px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', zIndex: 10, background: 'rgba(0,0,0,0.4)', padding: '6px 12px', borderRadius: '20px' }}>
+                          {court.images.map((img, idx) => (
+                            <div key={idx} onClick={() => setActiveImage(img)} style={{ width: '10px', height: '10px', borderRadius: '50%', background: activeImage === img ? '#3b82f6' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'background 0.2s' }} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : <div className="placeholder-large">No Image</div>}
             </div>
-            {court.images && court.images.length > 1 && (
-              <div style={{display:'flex', gap:'10px', marginTop:'10px', overflowX:'auto', paddingBottom:'10px'}}>
-                {court.images.map((img, idx) => (
-                  <img 
-                    key={idx} 
-                    src={img} 
-                    onClick={() => setActiveImage(img)}
-                    style={{width:'80px', height:'80px', objectFit:'cover', borderRadius:'8px', cursor:'pointer', border: activeImage === img ? '2px solid #3b82f6' : '2px solid transparent'}} 
-                  />
-                ))}
-              </div>
-            )}
             
-            <div className="info-box" style={{marginTop:'2rem'}}>
-                <h3>About this Venue</h3>
-                <p style={{ marginTop:'0', marginBottom:'12px', color:'#93c5fd', fontWeight:'600' }}>
-                  🕒 Open Hours: {to12Hour(court.operationalStartTime || '00:00')} - {to12Hour(court.operationalEndTime || '24:00')}
-                </p>
-                <p className="desc-text">{court.description}</p>
-                <h3>Amenities</h3>
+            <div className="info-box">
+                <div style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '12px', padding: '20px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '15px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
+                    <div style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '12px', borderRadius: '12px', fontSize: '1.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        🕒
+                    </div>
+                    <div>
+                        <h4 style={{ margin: 0, color: '#60a5fa', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Operating Hours</h4>
+                        <p style={{ margin: 0, color: '#ffffff', fontWeight: '800', fontSize: '1.4rem' }}>
+                            {to12Hour(court.operationalStartTime || '00:00')} - {to12Hour(court.operationalEndTime || '24:00')}
+                        </p>
+                    </div>
+                </div>
+                
+                <p className="desc-text" style={{ fontSize: '1.05rem', lineHeight: '1.7' }}>{court.description}</p>
+                <h3 style={{ marginTop: '2rem' }}>Amenities</h3>
                 <div className="amenities-list">
                     <ul>
                       {(court.amenities?.length ? court.amenities : ['Parking', 'Showers', 'Floodlights', 'Cafe']).map((a) => (
@@ -232,9 +266,6 @@ const CourtDetails = () => {
                         referrerPolicy="no-referrer-when-downgrade"
                       />
                     ) : null}
-                    <div style={{marginTop:'8px'}}>
-                      <a href={getEmbedMapUrl(court.googleMapLink) || court.googleMapLink} target="_blank" rel="noreferrer" style={{color:'#60a5fa'}}>Open in Google Maps</a>
-                    </div>
                   </div>
                 )}
                 {court.reviews && court.reviews.length > 0 && (

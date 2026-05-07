@@ -167,7 +167,7 @@ const MyBookings = () => {
                               <div style={{display:'grid', gap:'6px'}}>
                                 <span style={{color:'#ef4444', fontWeight:'bold'}}>Refund Disputed.</span>
                                 <a
-                                  href={`mailto:support@khello.com?subject=${encodeURIComponent(`Dispute for Booking ${b._id}`)}&body=${encodeURIComponent(`Reason: ${b.disputeReason || ''}`)}`}
+                                  href={`mailto:support@khelokarachi.com?subject=${encodeURIComponent(`Dispute for Booking ${b._id}`)}&body=${encodeURIComponent(`Reason: ${b.disputeReason || ''}`)}`}
                                   style={{color:'#60a5fa'}}
                                 >
                                   Email Support
