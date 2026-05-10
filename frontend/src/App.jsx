@@ -6,6 +6,7 @@ import Courts from './pages/Home';
 import CourtDetails from './pages/CourtDetails';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
 import TeamProfile from './pages/TeamProfile';
 import FindTeam from './pages/FindTeam';
 import AdminBookings from './pages/AdminBookings';
@@ -34,6 +35,7 @@ function App() {
           <Route element={<ContainerLayout />}>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             
             <Route path="/courts" element={<Courts />} />
             <Route path="/courts/:id" element={<CourtDetails />} />

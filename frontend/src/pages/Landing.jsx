@@ -1,10 +1,34 @@
-import { useEffect, useContext } from 'react';
+import { useEffect, useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 
 const Landing = () => {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+  const [openFaq, setOpenFaq] = useState(null);
+
+  const toggleFaq = (index) => {
+    setOpenFaq(openFaq === index ? null : index);
+  };
+
+  const faqs = [
+    {
+      question: "How do I book a court on Khelo Karachi?",
+      answer: "Booking is simple! Navigate to the 'Browse Courts' page, select your preferred facility (Futsal, Padel, or Cricket), choose a date and time slot, and submit your request. You'll then be prompted to upload payment proof to confirm your booking."
+    },
+    {
+      question: "How does competitive matchmaking work?",
+      answer: "If you don't have a full squad or want to test your team against others, use our matchmaking feature. Create an open match post with your squad size and wait for other teams to challenge you. Accept a challenge, and the match is set!"
+    },
+    {
+      question: "What is the cancellation and refund policy?",
+      answer: "Refunds and cancellations depend on the specific court's policy and how close you are to the booking time. If a booking is rejected by the manager or successfully disputed, a full refund will be processed. You can also request a reschedule up to 6 hours before your match."
+    },
+    {
+      question: "Can I manage my own sports facility on this platform?",
+      answer: "Absolutely! We partner with facility owners across Karachi. Contact us using the link at the bottom of the page to get your court listed and start receiving online bookings."
+    }
+  ];
 
   useEffect(() => {
     if (user && user.role === 'manager') {
@@ -104,6 +128,32 @@ const Landing = () => {
             </p>
             <span className="service-link">VIEW PROFILE <span>&rarr;</span></span>
           </div>
+        </div>
+      </section>
+
+      {/* FAQ SECTION */}
+      <section className="faq-section" style={{ padding: '4rem 2rem', maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+          <h2 style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-main)' }}>FREQUENTLY ASKED QUESTIONS</h2>
+          <p style={{ color: 'var(--text-muted)' }}>Everything you need to know about Khelo Karachi.</p>
+        </div>
+        <div className="faq-list">
+          {faqs.map((faq, index) => (
+            <div key={index} style={{ marginBottom: '1rem', background: 'var(--bg-secondary)', borderRadius: '10px', overflow: 'hidden' }}>
+              <button 
+                onClick={() => toggleFaq(index)}
+                style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', background: 'none', border: 'none', color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', textAlign: 'left' }}
+              >
+                {faq.question}
+                <span style={{ fontSize: '1.5rem', color: 'var(--primary-color)' }}>{openFaq === index ? '−' : '+'}</span>
+              </button>
+              {openFaq === index && (
+                <div style={{ padding: '0 1.5rem 1.5rem 1.5rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
+                  {faq.answer}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </section>
 

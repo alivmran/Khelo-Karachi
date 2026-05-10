@@ -3,12 +3,20 @@ const router = express.Router();
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const { protect, manager } = require('../middleware/authMiddleware');
+const { sendEmail } = require('../utils/emailService');
 
 const parseHour = (timeString) => {
   if (!timeString || typeof timeString !== 'string') return null;
   const [h, m] = timeString.split(':').map(Number);
   if (Number.isNaN(h) || Number.isNaN(m) || m !== 0 || h < 0 || h > 24) return null;
   return h;
+};
+
+const isOutsideHours = (startHour, endHour, openHour, closeHour) => {
+  if (closeHour <= openHour) {
+    return !( (startHour >= openHour && endHour <= 24) || (startHour >= 0 && endHour <= closeHour) );
+  }
+  return startHour < openHour || endHour > closeHour;
 };
 
 router.get('/dashboard', protect, manager, async (req, res, next) => {
@@ -58,7 +66,7 @@ router.post('/block', protect, manager, async (req, res, next) => {
       if (startHour === null || endHour === null || endHour <= startHour) {
         return res.status(400).json({ message: 'Invalid time block' });
       }
-      if (startHour < openHour || endHour > closeHour) {
+      if (isOutsideHours(startHour, endHour, openHour, closeHour)) {
         return res.status(400).json({ message: 'Selected time is outside operational hours' });
       }
 
@@ -106,6 +114,15 @@ router.put('/booking/:id', protect, manager, async (req, res, next) => {
 
     booking.status = status === 'Rejected' ? 'Awaiting Refund Details' : status;
     await booking.save();
+
+    const bookingUser = await require('../models/User').findById(booking.user);
+    if (bookingUser) {
+      const subject = status === 'Approved' ? 'Booking Approved' : 'Booking Rejected';
+      const msgBody = status === 'Approved' ? 
+        `Your booking at ${court.name} has been approved. Enjoy your game!` : 
+        `Your booking at ${court.name} was rejected. Please log in and provide refund details.`;
+      sendEmail(bookingUser.email, subject, subject, msgBody);
+    }
 
     const Notification = require('../models/Notification');
     const notif = new Notification({

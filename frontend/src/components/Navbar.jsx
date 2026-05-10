@@ -21,10 +21,10 @@ const Navbar = () => {
   const [notifications, setNotifications] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (user && user.token) {
-      // Create a global socket or connect here
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const socket = io(apiUrl);
       socket.emit('register', user._id);
@@ -86,96 +86,94 @@ const Navbar = () => {
       else navigate('/');
   }
 
+  const closeMobile = () => setMobileMenuOpen(false);
+
   return (
     <nav className="navbar">
+      {/* Logo */}
       <div 
         onClick={goHome} 
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          cursor: 'pointer',
-          height: '100%'
-        }}
+        style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', height: '100%' }}
       >
         <img 
           src="/khelo-logo.png" 
           alt="Khelo Karachi Logo" 
-          style={{ 
-            height: '60px', 
-            width: 'auto', 
-            objectFit: 'contain', 
-            display: 'block',
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            padding: '4px'
-          }} 
+          style={{ height: '60px', width: 'auto', objectFit: 'contain', display: 'block', backgroundColor: '#ffffff', borderRadius: '12px', padding: '4px' }} 
         />
       </div>
-      
-      <div className="links">
-        {/* --- SUPER ADMIN LINKS --- */}
+
+      {/* Right side controls (always visible) */}
+      <div className="navbar-right">
+        {/* Bell - always visible outside hamburger */}
+        {user && (
+          <div className="notification-wrapper" style={{ position: 'relative' }}>
+            <button 
+               onClick={() => setShowDropdown(!showDropdown)} 
+               style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '1.3rem', cursor: 'pointer', position: 'relative', padding: '6px' }}>
+               🔔
+               {unreadCount > 0 && <span className="notification-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+            </button>
+            
+            {showDropdown && (
+                <div className="notification-dropdown">
+                    <div className="dropdown-header">
+                        <h4>Notifications</h4>
+                        {unreadCount > 0 && <button onClick={markAllAsRead} className="mark-all-btn">Mark all read</button>}
+                    </div>
+                    <div className="dropdown-body">
+                        {!Array.isArray(notifications) || notifications.length === 0 ? (
+                            <p className="no-notifs">No new notifications</p>
+                        ) : (
+                            notifications.map(n => (
+                                <div key={n._id} className={`notification-item ${!n.isRead ? 'unread' : ''}`} onClick={() => markAsRead(n._id, n.link)}>
+                                    <p>{n.message}</p>
+                                    <span className="time">{new Date(n.createdAt).toLocaleDateString()}</span>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+          </div>
+        )}
+
+        {/* Hamburger - mobile only */}
+        <button className="mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          {mobileMenuOpen ? '✕' : '☰'}
+        </button>
+      </div>
+
+      {/* Nav links (collapsible on mobile) */}
+      <div className={`links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         {isSuperAdmin && (
             <>
-                <Link to="/admin/dashboard" className="nav-action">Admin Panel</Link>
+                <Link to="/admin/dashboard" className="nav-action" onClick={closeMobile}>Admin Panel</Link>
                 <span className="badge" style={{background:'#ef4444', color:'white'}}>Super Admin</span>
             </>
         )}
 
-        {/* --- MANAGER LINKS --- */}
         {isManager && (
             <>
-                <Link to="/manager/dashboard" className="nav-action">Manager Dashboard</Link>
+                <Link to="/manager/dashboard" className="nav-action" onClick={closeMobile}>Manager Dashboard</Link>
                 <span className="badge" style={{background:'#10b981', color:'white'}}>Manager</span>
             </>
         )}
 
-        {/* --- PLAYER LINKS --- */}
         {(!user || isUser) && (
-            <Link to="/courts" className="nav-action">Browse Courts</Link>
+            <Link to="/courts" className="nav-action" onClick={closeMobile}>Browse Courts</Link>
         )}
         {isUser && (
             <>
-                <Link to="/find-team" className="nav-action">Find Match</Link>
-                <Link to="/profile" className="nav-action">My Profile</Link>
+                <Link to="/find-team" className="nav-action" onClick={closeMobile}>Find Match</Link>
+                <Link to="/requests" className="nav-action" onClick={closeMobile}>Requests</Link>
+                <Link to="/profile" className="nav-action" onClick={closeMobile}>My Profile</Link>
             </>
         )}
 
-        {/* --- AUTH --- */}
         {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                <div className="notification-wrapper" style={{ position: 'relative' }}>
-                    <button 
-                       onClick={() => setShowDropdown(!showDropdown)} 
-                       style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '1.2rem', cursor: 'pointer', position: 'relative' }}>
-                       🔔
-                       {unreadCount > 0 && <span className="notification-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
-                    </button>
-                    
-                    {showDropdown && (
-                        <div className="notification-dropdown">
-                            <div className="dropdown-header">
-                                <h4>Notifications</h4>
-                                {unreadCount > 0 && <button onClick={markAllAsRead} className="mark-all-btn">Mark all read</button>}
-                            </div>
-                            <div className="dropdown-body">
-                                {!Array.isArray(notifications) || notifications.length === 0 ? (
-                                    <p className="no-notifs">No new notifications</p>
-                                ) : (
-                                    notifications.map(n => (
-                                        <div key={n._id} className={`notification-item ${!n.isRead ? 'unread' : ''}`} onClick={() => markAsRead(n._id, n.link)}>
-                                            <p>{n.message}</p>
-                                            <span className="time">{new Date(n.createdAt).toLocaleDateString()}</span>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-                <button onClick={handleLogout}>Logout</button>
-            </div>
+            <button onClick={() => { handleLogout(); closeMobile(); }} className="nav-logout-btn">Logout</button>
         ) : (
-           <Link to="/login" className="login-link">Login</Link>
+           <Link to="/login" className="nav-action" onClick={closeMobile}>Login</Link>
         )}
       </div>
     </nav>

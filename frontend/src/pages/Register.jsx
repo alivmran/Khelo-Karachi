@@ -12,9 +12,9 @@ const Register = () => {
     e.preventDefault();
     try {
       await register(formData.name, formData.email, formData.password);
-      navigate('/'); 
-    } catch {
-      toast.error('Registration failed. Try again.');
+      navigate('/verify-email', { state: { email: formData.email } }); 
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Registration failed. Try again.');
     }
   };
 

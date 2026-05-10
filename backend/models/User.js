@@ -11,6 +11,9 @@ const userSchema = mongoose.Schema({
     enum: ['user', 'manager', 'admin'], 
     default: 'user' 
   },
+  isVerified: { type: Boolean, default: false },
+  verificationCode: { type: String },
+  verificationCodeExpires: { type: Date },
   matchesPlayed: { type: Number, default: 0 },
   noShows: { type: Number, default: 0 },
   // If manager, which court do they manage?

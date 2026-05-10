@@ -4,6 +4,7 @@ const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const { protect, admin, manager } = require('../middleware/authMiddleware');
 const rateLimit = require('express-rate-limit');
+const { sendEmail } = require('../utils/emailService');
 
 const bookingLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -16,6 +17,13 @@ const parseHour = (timeString) => {
   const [h, m] = timeString.split(':').map(Number);
   if (Number.isNaN(h) || Number.isNaN(m) || m !== 0 || h < 0 || h > 24) return null;
   return h;
+};
+
+const isOutsideHours = (startHour, endHour, openHour, closeHour) => {
+  if (closeHour <= openHour) {
+    return !( (startHour >= openHour && endHour <= 24) || (startHour >= 0 && endHour <= closeHour) );
+  }
+  return startHour < openHour || endHour > closeHour;
 };
 
 const OCCUPIED_STATUSES = ['Awaiting Payment', 'Pending', 'Approved'];
@@ -59,7 +67,7 @@ router.post('/block', protect, manager, async (req, res, next) => {
     const closeHour = parseHour(court?.operationalEndTime || '24:00');
     const startHour = parseHour(startTime);
     const endHour = parseHour(endTime);
-    if (startHour < openHour || endHour > closeHour) {
+    if (isOutsideHours(startHour, endHour, openHour, closeHour)) {
       res.status(400);
       throw new Error('Selected time is outside operational hours.');
     }
@@ -152,7 +160,7 @@ router.post('/', protect, bookingLimiter, async (req, res, next) => {
         res.status(400);
         throw new Error('Invalid slot selected.');
       }
-      if (startHour < openHour || endHour > closeHour) {
+      if (isOutsideHours(startHour, endHour, openHour, closeHour)) {
         res.status(400);
         throw new Error(`Slot ${startTime}-${endTime} is outside operational hours.`);
       }
@@ -206,12 +214,12 @@ router.put('/:id/submit-payment-proof', protect, async (req, res, next) => {
       throw new Error('Last 4 digits of TID must be exactly 4 numbers.');
     }
 
-    const booking = await Booking.findById(req.params.id).populate('court');
+    const booking = await Booking.findById(req.params.id).populate({ path: 'court', populate: { path: 'manager' } }).populate('user');
     if (!booking) {
       res.status(404);
       throw new Error('Booking not found');
     }
-    if (booking.user.toString() !== req.user._id.toString()) {
+    if (booking.user._id.toString() !== req.user._id.toString()) {
       res.status(401);
       throw new Error('Not authorized');
     }
@@ -236,9 +244,11 @@ router.put('/:id/submit-payment-proof', protect, async (req, res, next) => {
       await notif.save();
       const io = req.app.get('io');
       const userSockets = req.app.get('userSockets');
-      if (io && userSockets && userSockets.has(booking.court.manager.toString())) {
-        io.to(userSockets.get(booking.court.manager.toString())).emit('newNotification', notif);
+      if (io && userSockets && userSockets.has(booking.court.manager._id.toString())) {
+        io.to(userSockets.get(booking.court.manager._id.toString())).emit('newNotification', notif);
       }
+      const managerEmail = booking.court.notificationEmail || booking.court.manager.email;
+      sendEmail(managerEmail, 'Action Required: Pending Booking', 'Pending Booking Request', `A new payment proof has been submitted for ${booking.court.name}. Please review and approve.`);
     }
 
     res.json(updatedBooking);
@@ -475,12 +485,12 @@ router.patch('/:id/status', protect, manager, async (req, res, next) => {
 router.put('/:id/supply-refund-info', protect, async (req, res, next) => {
   try {
     const { refundBankName, refundAccountTitle, refundAccountNumber, refundContactNumber } = req.body;
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id).populate('user').populate({ path: 'court', populate: { path: 'manager' } });
     if (!booking) {
       res.status(404);
       throw new Error('Booking not found');
     }
-    if (booking.user.toString() !== req.user._id.toString()) {
+    if (booking.user._id.toString() !== req.user._id.toString()) {
       res.status(401);
       throw new Error('Not authorized');
     }
@@ -496,19 +506,21 @@ router.put('/:id/supply-refund-info', protect, async (req, res, next) => {
     const updatedBooking = await booking.save();
 
     const Notification = require('../models/Notification');
-    const court = await Court.findById(booking.court);
+    const court = booking.court;
     if (court && court.manager) {
       const notif = new Notification({
-        recipient: court.manager,
+        recipient: court.manager._id,
         message: `User provided refund details for booking at ${court.name}. Action required.`,
         type: 'booking'
       });
       await notif.save();
       const io = req.app.get('io');
       const userSockets = req.app.get('userSockets');
-      if (io && userSockets && userSockets.has(court.manager.toString())) {
-        io.to(userSockets.get(court.manager.toString())).emit('newNotification', notif);
+      if (io && userSockets && userSockets.has(court.manager._id.toString())) {
+        io.to(userSockets.get(court.manager._id.toString())).emit('newNotification', notif);
       }
+      const managerEmail = court.notificationEmail || court.manager.email;
+      sendEmail(managerEmail, 'Refund Details Submitted', 'Refund Details Submitted', `The user ${booking.user.name} has submitted refund details for their rejected booking. Please process the refund.`);
     }
 
     res.json(updatedBooking);
@@ -542,14 +554,14 @@ router.put('/:id/reject', protect, manager, async (req, res, next) => {
 router.put('/:id/complete-refund', protect, manager, async (req, res, next) => {
   try {
     const { refundTransactionId } = req.body;
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id).populate('user').populate({ path: 'court', populate: { path: 'manager' } });
     if (!booking) {
       res.status(404);
       throw new Error('Booking not found');
     }
     if (req.user.role === 'manager') {
-      const court = await Court.findById(booking.court);
-      if (!court || court.manager.toString() !== req.user._id.toString()) {
+      const court = booking.court;
+      if (!court || court.manager._id.toString() !== req.user._id.toString()) {
         res.status(401);
         throw new Error('Not authorized for this court');
       }
@@ -563,18 +575,19 @@ router.put('/:id/complete-refund', protect, manager, async (req, res, next) => {
     const updatedBooking = await booking.save();
 
     const Notification = require('../models/Notification');
-    const courtData = await Court.findById(booking.court);
+    const courtData = booking.court;
     const notif = new Notification({
-      recipient: booking.user,
+      recipient: booking.user._id,
       message: `Refund sent for ${courtData.name}. Please verify receipt.`,
       type: 'booking'
     });
     await notif.save();
     const io = req.app.get('io');
     const userSockets = req.app.get('userSockets');
-    if (io && userSockets && userSockets.has(booking.user.toString())) {
-      io.to(userSockets.get(booking.user.toString())).emit('newNotification', notif);
+    if (io && userSockets && userSockets.has(booking.user._id.toString())) {
+      io.to(userSockets.get(booking.user._id.toString())).emit('newNotification', notif);
     }
+    sendEmail(booking.user.email, 'Refund Claimed by Manager', 'Refund Processed', `Your refund for ${courtData.name} has been processed. Transaction ID: ${refundTransactionId}. Please verify receipt on the platform.`);
 
     res.json(updatedBooking);
   } catch (error) {
@@ -585,12 +598,12 @@ router.put('/:id/complete-refund', protect, manager, async (req, res, next) => {
 router.put('/:id/verify-refund', protect, async (req, res, next) => {
   try {
     const { received, disputeReason } = req.body;
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id).populate('user').populate({ path: 'court', populate: { path: 'manager' } });
     if (!booking) {
       res.status(404);
       throw new Error('Booking not found');
     }
-    if (booking.user.toString() !== req.user._id.toString()) {
+    if (booking.user._id.toString() !== req.user._id.toString()) {
       res.status(401);
       throw new Error('Not authorized');
     }
@@ -608,7 +621,7 @@ router.put('/:id/verify-refund', protect, async (req, res, next) => {
       const Notification = require('../models/Notification');
       const User = require('../models/User');
       const admins = await User.find({ role: 'admin' });
-      const court = await Court.findById(booking.court);
+      const court = booking.court;
       
       const io = req.app.get('io');
       const userSockets = req.app.get('userSockets');
@@ -623,7 +636,12 @@ router.put('/:id/verify-refund', protect, async (req, res, next) => {
         if (io && userSockets && userSockets.has(admin._id.toString())) {
           io.to(userSockets.get(admin._id.toString())).emit('newNotification', notif);
         }
+        sendEmail(admin.email, 'Action Required: Refund Disputed', 'Refund Disputed', `A user has disputed a refund for ${court ? court.name : 'Unknown Court'}. Reason: ${disputeReason}. Please review in the Admin Dashboard.`);
       }
+      
+      const managerEmail = court.notificationEmail || court.manager.email;
+      sendEmail(managerEmail, 'Refund Disputed', 'Refund Disputed', `The refund for a booking at ${court.name} has been disputed by the user. You will be contacted by Khelo Karachi support in 24 hours.`);
+      sendEmail(booking.user.email, 'Refund Disputed', 'Refund Disputed', `You have disputed the refund for ${court.name}. You will be contacted by Khelo Karachi support in 24 hours.`);
     }
     const updatedBooking = await booking.save();
     res.json(updatedBooking);

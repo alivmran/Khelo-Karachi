@@ -3,8 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 import { toast } from 'react-toastify';
 
-
-
 const Login = () => {
   const { login, user } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -28,7 +26,12 @@ const Login = () => {
     try {
       await login(email, password);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Login failed');
+      if (error.response?.data?.message === 'UNVERIFIED_EMAIL') {
+        toast.info('Please verify your email address. A new code has been sent to your inbox.');
+        navigate('/verify-email', { state: { email } });
+      } else {
+        toast.error(error.response?.data?.message || 'Login failed');
+      }
     }
   };
 

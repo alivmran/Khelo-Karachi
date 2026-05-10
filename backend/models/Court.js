@@ -14,6 +14,7 @@ const courtSchema = mongoose.Schema({
     enum: ['Padel', 'Futsal', 'Cricket']
   }],
   location: { type: String, default: 'Karachi, Pakistan' }, // New
+  notificationEmail: { type: String }, // For manager notifications
   googleMapLink: { type: String }, // New
   paymentBank: { type: String },
   paymentAccountTitle: { type: String },

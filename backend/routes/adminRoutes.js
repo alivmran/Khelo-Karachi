@@ -5,12 +5,20 @@ const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const { protect, admin } = require('../middleware/authMiddleware');
 const { upload } = require('../config/cloudinary');
+const { sendEmail } = require('../utils/emailService');
 
 const parseHour = (timeString) => {
   if (!timeString || typeof timeString !== 'string') return null;
   const [h, m] = timeString.split(':').map(Number);
   if (Number.isNaN(h) || Number.isNaN(m) || m !== 0 || h < 0 || h > 24) return null;
   return h;
+};
+
+const isOutsideHours = (startHour, endHour, openHour, closeHour) => {
+  if (closeHour <= openHour) {
+    return !( (startHour >= openHour && endHour <= 24) || (startHour >= 0 && endHour <= closeHour) );
+  }
+  return startHour < openHour || endHour > closeHour;
 };
 
 // @desc    Global Admin Data
@@ -49,14 +57,15 @@ router.post('/create-court', protect, admin, upload.array('images', 5), async (r
       pricePerHour,
       priceWeekend,
       managerName,
-      managerEmail
+      managerEmail,
+      notificationEmail
     } = req.body;
 
     const startHour = parseHour(operationalStartTime || '00:00');
     const endHour = parseHour(operationalEndTime || '24:00');
-    if (startHour === null || endHour === null || endHour <= startHour) {
+    if (startHour === null || endHour === null) {
       res.status(400);
-      throw new Error('Operational hours must be hourly values and end after start.');
+      throw new Error('Operational hours must be valid hourly values.');
     }
 
     // Check if Email Taken
@@ -92,6 +101,7 @@ router.post('/create-court', protect, admin, upload.array('images', 5), async (r
         pricePerHour,
         priceWeekend: priceWeekend || pricePerHour, 
         manager: manager._id, 
+        notificationEmail,
         images: imageUrls
     });
 
@@ -144,7 +154,7 @@ router.get('/court/:id/stats', protect, admin, async (req, res, next) => {
 // @desc    Assign Manager to Existing Court
 router.post('/assign-manager', protect, admin, async (req, res, next) => {
   try {
-    const { courtId, managerName, managerEmail } = req.body;
+    const { courtId, managerName, managerEmail, notificationEmail } = req.body;
     const court = await Court.findById(courtId);
     if (!court) throw new Error('Court not found');
     const existingUser = await User.findOne({ email: managerEmail });
@@ -152,6 +162,7 @@ router.post('/assign-manager', protect, admin, async (req, res, next) => {
     const password = req.body.password;
     const manager = await User.create({ name: managerName, email: managerEmail, password, role: 'manager', managedCourt: court._id });
     court.manager = manager._id;
+    if (notificationEmail) court.notificationEmail = notificationEmail;
     await court.save();
     res.status(201).json({ message: 'Manager Assigned', manager: { email: manager.email, password } });
   } catch(error) {
@@ -231,7 +242,7 @@ router.post('/block-slot', protect, admin, async (req, res, next) => {
             res.status(400);
             throw new Error('Invalid time block.');
           }
-          if (blockStartHour < openHour || blockEndHour > closeHour) {
+          if (isOutsideHours(blockStartHour, blockEndHour, openHour, closeHour)) {
             res.status(400);
             throw new Error('Block time is outside operational hours.');
           }
@@ -260,6 +271,12 @@ router.put('/disputes/:id/resolve', protect, admin, async (req, res, next) => {
     }
     booking.status = 'Refunded';
     await booking.save();
+
+    const bookingUser = await User.findById(booking.user);
+    if (bookingUser) {
+      sendEmail(bookingUser.email, 'Dispute Resolved', 'Dispute Resolved', 'Your dispute has been resolved by the admin and the status has been updated to Refunded.');
+    }
+
     res.json({ message: 'Dispute marked as resolved.' });
   } catch (error) {
     next(error);

@@ -12,7 +12,7 @@ const AdminDashboard = () => {
     amenities: [],
     paymentBank: '', paymentAccountTitle: '', paymentAccountNumber: '', advanceRequired: '',
     operationalStartTime: '00:00', operationalEndTime: '24:00',
-    pricePerHour: '', priceWeekend: '', managerName: '', managerEmail: ''
+    pricePerHour: '', priceWeekend: '', managerName: '', managerEmail: '', notificationEmail: ''
   });
   const [images, setImages] = useState([]);
   const hourOptions = Array.from({ length: 25 }, (_, h) => `${h.toString().padStart(2, '0')}:00`);
@@ -52,7 +52,7 @@ const AdminDashboard = () => {
         amenities: [],
         paymentBank: '', paymentAccountTitle: '', paymentAccountNumber: '', advanceRequired: '',
         operationalStartTime: '00:00', operationalEndTime: '24:00',
-        pricePerHour: '', priceWeekend: '', managerName: '', managerEmail: ''
+        pricePerHour: '', priceWeekend: '', managerName: '', managerEmail: '', notificationEmail: ''
       });
       setImages([]);
       fetchData();
@@ -88,12 +88,13 @@ const AdminDashboard = () => {
   const handleAssignManager = async (courtId) => {
     const name = window.prompt("Enter Manager Name:");
     if (!name) return;
-    const email = window.prompt("Enter Manager Email:");
+    const email = window.prompt("Enter Manager Login Email (e.g. demo account):");
     if (!email) return;
+    const notifEmail = window.prompt("Enter Manager's Actual Email for Notifications (optional):");
     const password = window.prompt("Enter Initial Password for Manager:");
     if (!password) return;
     try {
-        const res = await API.post('/admin/assign-manager', { courtId, managerName: name, managerEmail: email, password });
+        const res = await API.post('/admin/assign-manager', { courtId, managerName: name, managerEmail: email, notificationEmail: notifEmail, password });
         toast.success(`Assigned! Password: ${res.data.manager.password}`);
         fetchData();
     } catch (error) { toast.error(error.response?.data?.message || 'Failed'); }
@@ -215,8 +216,9 @@ const AdminDashboard = () => {
                 <h3>Assign Manager</h3>
                 <div className="form-row">
                     <div className="form-group"><label>Name</label><input value={form.managerName} onChange={e=>setForm({...form, managerName:e.target.value})} required /></div>
-                    <div className="form-group"><label>Email</label><input type="email" value={form.managerEmail} onChange={e=>setForm({...form, managerEmail:e.target.value})} required /></div>
+                    <div className="form-group"><label>Login Email (Demo Acct)</label><input type="email" value={form.managerEmail} onChange={e=>setForm({...form, managerEmail:e.target.value})} required /></div>
                 </div>
+                <div className="form-group"><label>Actual Email for Notifications (Optional)</label><input type="email" value={form.notificationEmail} onChange={e=>setForm({...form, notificationEmail:e.target.value})} /></div>
                 <div className="form-group">
                     <label>Court Images (Max 5)</label>
                     <input type="file" multiple accept="image/*" onChange={(e) => setImages(e.target.files)} style={{background: 'var(--bg-input)', padding: '10px'}} />

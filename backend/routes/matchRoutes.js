@@ -6,6 +6,7 @@ const User = require('../models/User');
 
 const Booking = require('../models/Booking');
 const { protect } = require('../middleware/authMiddleware');
+const { sendEmail } = require('../utils/emailService');
 
 const toDateTime = (dateStr, startTime) => new Date(`${dateStr}T${startTime}:00`);
 const isUpcoming = (dateStr, startTime) => toDateTime(dateStr, startTime) > new Date();
@@ -201,6 +202,25 @@ router.post('/requests', protect, async (req, res, next) => {
       matchPost: matchPostId
     });
 
+    const receiverUser = await User.findById(receiverId);
+    if (receiverUser) {
+      sendEmail(receiverUser.email, 'New Challenge Request', 'New Match Challenge', `You have received a new challenge request. Check your Khelo Karachi dashboard to respond.`);
+
+      // In-app notification
+      const Notification = require('../models/Notification');
+      const notif = new Notification({
+        recipient: receiverId,
+        message: `${req.user.name} has challenged your team!`,
+        type: 'match'
+      });
+      await notif.save();
+      const io = req.app.get('io');
+      const userSockets = req.app.get('userSockets');
+      if (io && userSockets && userSockets.has(receiverId.toString())) {
+        io.to(userSockets.get(receiverId.toString())).emit('newNotification', notif);
+      }
+    }
+
     res.status(201).json(request);
 
   } catch (error) {
@@ -325,6 +345,14 @@ router.put('/requests/:id', protect, async (req, res, next) => {
       }
     }
 
+    if (status === 'ACCEPTED') {
+      const senderUser = await User.findById(request.sender);
+      if (senderUser) {
+        sendEmail(senderUser.email, 'Challenge Accepted', 'Challenge Accepted', `Your challenge has been accepted! See you on the pitch.`);
+      }
+      sendEmail(req.user.email, 'Challenge Accepted', 'Challenge Accepted', `You have accepted the challenge. Prepare your squad!`);
+    }
+
     res.json(request);
   } catch (error) {
     next(error);
@@ -425,8 +453,18 @@ router.put('/:id/report-attendance', protect, async (req, res, next) => {
 
     const inc = challengerAttended ? { matchesPlayed: 1 } : { noShows: 1 };
     await User.findByIdAndUpdate(match.challengerUser, { $inc: inc });
+    // Also increment host's matchesPlayed (host always showed up since they're reporting)
+    await User.findByIdAndUpdate(match.user, { $inc: { matchesPlayed: 1 } });
     match.attendanceReported = true;
     await match.save();
+
+    if (!challengerAttended) {
+      const challenger = await User.findById(match.challengerUser);
+      if (challenger) {
+        sendEmail(challenger.email, 'No-Show Reported', 'Attendance Report', `You have been marked as a no-show for your recent match. Repeated no-shows may result in account suspension.`);
+      }
+    }
+
     res.json({ message: 'Attendance reported successfully' });
   } catch (error) {
     next(error);

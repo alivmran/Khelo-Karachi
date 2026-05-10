@@ -19,10 +19,24 @@ body {
     background-color: var(--bg-body); 
     color: var(--text-primary); 
     min-height: 100vh;
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 50px 50px;
+    background-attachment: fixed;
 }
 
 /* --- LAYOUT WRAPPERS --- */
-.app-wrapper { display: flex; flex-direction: column; min-height: 100vh; }
+.app-wrapper { display: flex; flex-direction: column; min-height: 100vh; position: relative; }
+.app-wrapper::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(59, 130, 246, 0.06) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+}
+.main-content-wrapper { position: relative; z-index: 1; }
 .main-content { flex: 1; }
 .container { padding: 2rem; max-width: 1200px; margin: 0 auto; width: 100%; }
 .page-container { width: 100%; animation: fadeIn 0.3s ease-out; }
@@ -39,9 +53,13 @@ body {
     border-bottom: 1px solid var(--border-color);
     position: sticky;
     top: 0;
-    z-index: 1000; /* Ensures Navbar stays on top */
+    z-index: 1000;
     height: 70px;
+    flex-wrap: wrap;
 }
+.navbar-right { display: flex; align-items: center; gap: 12px; }
+.nav-logout-btn { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.nav-logout-btn:hover { background: rgba(239,68,68,0.3); }
 
 .logo-container { height: 100%; display: flex; align-items: center; gap: 12px; cursor: pointer; }
 .logo-img { max-height: 45px; width: auto; object-fit: contain; }
@@ -585,26 +603,149 @@ body {
 }
 @media (max-width: 900px) { .dashboard-layout { grid-template-columns: 1fr; } }
 
-@media (max-width: 900px) {
+/* ============================
+   MOBILE RESPONSIVE OVERHAUL
+   ============================ */
+
+/* --- Hamburger Toggle (controlled via JS) --- */
+.mobile-menu-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.6rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+.mobile-menu-btn:hover { background: rgba(255,255,255,0.1); }
+
+@media (max-width: 768px) {
+    .mobile-menu-btn { display: block; }
+    
+    /* NAVBAR */
     .navbar {
-        padding: 0.75rem 1rem;
+        padding: 0.5rem 1rem;
         height: auto;
-        min-height: 70px;
-        flex-wrap: wrap;
-        gap: 10px;
+        min-height: 56px;
+        gap: 0;
     }
+    .navbar > div:first-child img { height: 42px !important; }
+    
+    .navbar-right { order: 2; }
+    
     .links {
+        display: none;
         width: 100%;
-        justify-content: flex-start;
-        flex-wrap: wrap;
-        gap: 0.8rem;
+        flex-direction: column;
+        gap: 0;
+        padding: 0.75rem 0 0.5rem;
+        border-top: 1px solid var(--border-color);
+        margin-top: 0.5rem;
+        order: 3;
     }
-    .container { padding: 1rem; }
-    .card-header { flex-wrap: wrap; gap: 8px; }
-    .bookings-table th, .bookings-table td { padding: 0.65rem; font-size: 0.88rem; }
-    .hero-banner { height: 240px; }
-    .hero-banner h1 { font-size: 1.7rem; }
-    .hero-banner p { font-size: 0.95rem; }
+    .links.mobile-open { display: flex; }
+    .links a, .links .nav-action {
+        padding: 12px 10px !important;
+        border-radius: 8px;
+        font-size: 1rem;
+        width: 100%;
+        display: block;
+        color: var(--text-primary) !important;
+    }
+    .links a:active, .links .nav-action:active { background: rgba(59,130,246,0.15); }
+    .links .nav-logout-btn { 
+        margin-top: 8px; 
+        width: 100%; 
+        text-align: center; 
+        padding: 12px; 
+    }
+    
+    /* Notification dropdown full width on mobile */
+    .notification-dropdown {
+        position: fixed !important;
+        top: 56px !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        border-radius: 0 0 12px 12px !important;
+        max-height: 60vh;
+    }
+    .dropdown-body { max-height: 50vh; }
+
+    /* CONTAINER & PAGES */
+    .container { padding: 1rem 0.75rem; }
+    .page-title { font-size: 1.5rem !important; }
+    
+    /* HERO */
+    .hero-section { padding: 3rem 1.25rem 2.5rem; min-height: 50vh; }
+    .hero-title { font-size: 2rem !important; letter-spacing: -0.5px; }
+    .hero-subtitle { font-size: 1rem !important; }
+    .hero-actions { flex-direction: column; width: 100%; gap: 0.75rem; }
+    .primary-btn-large, .secondary-btn-large { padding: 14px 24px; font-size: 0.9rem; width: 100%; text-align: center; }
+    
+    /* SERVICES SECTION */
+    .services-section { padding: 2rem 1rem; }
+    .services-header { margin-bottom: 2rem; }
+    .section-title { font-size: 1.5rem !important; }
+    .services-grid { grid-template-columns: 1fr !important; gap: 1rem; }
+    .service-card { padding: 1.5rem 1.25rem; }
+    
+    /* COURTS GRID */
+    .courts-grid { grid-template-columns: 1fr !important; gap: 1rem; }
+    
+    /* CARDS */
+    .card-header { flex-wrap: wrap; gap: 8px; padding: 1rem; }
+    .card-header h3 { font-size: 1rem; }
+    .card-body { padding: 1rem; }
+    .card-footer { padding: 0.75rem; }
+    
+    /* COURT DETAILS - Booking sidebar comes FIRST on mobile */
+    .details-layout { 
+        grid-template-columns: 1fr !important; 
+        display: flex !important;
+        flex-direction: column;
+    }
+    .details-layout .left-column { order: 2; }
+    .details-layout .booking-sidebar { order: 1; position: static !important; }
+    .gallery-box { height: 220px; order: 0; }
+    .book-slot-container { padding: 1rem; }
+    
+    /* FORMS */
+    .form-container { margin: 30px auto; padding: 1.5rem; width: calc(100% - 1.5rem); }
+    .form-row { flex-direction: column; gap: 0; }
+    .form-row .form-group { flex: none; }
+    .modal-content { width: 95%; padding: 1.25rem; }
+    .modal-actions { flex-direction: column; }
+    .modal-actions button { width: 100%; }
+    
+    /* TABS */
+    .match-tabs { gap: 0.5rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tab-btn { font-size: 0.85rem; white-space: nowrap; padding: 8px 12px; }
+    
+    /* STATS */
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+    .stat-card { padding: 1rem; }
+    .stat-value { font-size: 1.5rem; }
+    .stat-card h3 { font-size: 0.75rem; }
+    
+    /* TABLES */
+    .bookings-table th, .bookings-table td { padding: 0.5rem; font-size: 0.8rem; }
+    
+    /* FOOTER */
+    .site-footer { padding: 1.25rem 1rem 0.5rem; }
+    .footer-content { flex-direction: column; gap: 1.5rem; }
+    
+    /* FAQ SECTION */
+    .faq-section { padding: 2rem 1rem !important; }
+    .faq-section h2 { font-size: 1.5rem !important; }
+    .faq-section button { font-size: 1rem !important; padding: 1.2rem !important; }
+    
+    /* OWNER CTA */
+    .owner-cta-section { padding: 3rem 1.25rem !important; margin: 2rem 1rem !important; border-radius: 14px !important; }
+    .owner-cta-section h2 { font-size: 1.5rem !important; }
+    .owner-cta-section p { font-size: 1rem !important; }
 }
 
 /* --- COMMON UI ELEMENTS --- */
