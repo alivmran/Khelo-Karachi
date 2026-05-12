@@ -34,18 +34,8 @@ const bookingSchema = mongoose.Schema({
     default: 'Online'
   },
   totalPrice: { type: Number },
-  senderName: {
+  paymentScreenshot: {
     type: String
-  },
-  transactionIdShort: {
-    type: String,
-    validate: {
-      validator: function (value) {
-        if (this.type !== 'Online' || !value) return true;
-        return /^\d{4}$/.test(value || '');
-      },
-      message: 'transactionIdShort must be exactly 4 digits.'
-    }
   },
   advancePaid: { type: Number, default: 0 },
   refundBankName: { type: String },
@@ -60,5 +50,10 @@ const bookingSchema = mongoose.Schema({
     endTime: String
   }
 }, { timestamps: true });
+
+// Optimize Database Lookups & Throughput under Heavy Traffic Load
+bookingSchema.index({ user: 1, date: -1 });
+bookingSchema.index({ court: 1, facility: 1, date: 1, status: 1 });
+bookingSchema.index({ status: 1 });
 
 module.exports = mongoose.model('Booking', bookingSchema);

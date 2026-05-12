@@ -2,19 +2,19 @@ import { useEffect, useState } from 'react';
 import API from '../api/axios';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ShieldAlert, 
-  MapPin, 
-  PlusCircle, 
-  Settings, 
-  TrendingUp, 
-  Users, 
-  Home, 
-  AlertTriangle, 
-  Trash2, 
-  Key, 
-  ExternalLink, 
-  Clock, 
+import {
+  ShieldAlert,
+  MapPin,
+  PlusCircle,
+  Settings,
+  TrendingUp,
+  Users,
+  Home,
+  AlertTriangle,
+  Trash2,
+  Key,
+  ExternalLink,
+  Clock,
   CreditCard,
   Building2,
   Trophy,
@@ -34,10 +34,21 @@ const AdminDashboard = () => {
     amenities: [],
     paymentBank: '', paymentAccountTitle: '', paymentAccountNumber: '', advanceRequired: '',
     operationalStartTime: '00:00', operationalEndTime: '24:00',
-    pricePerHour: '', priceWeekend: '', managerName: '', managerEmail: '', managerMobile: '', notificationEmail: ''
+    pricePerHour: '', minSlots: 1,
+    pricePeak: '', peakStartTime: '', peakEndTime: '',
+    discountPercentage: '', discountValidUntil: '', discountTargetTier: 'both',
+    managerName: '', managerEmail: '', managerMobile: '', notificationEmail: ''
   });
   const [images, setImages] = useState([]);
   const hourOptions = Array.from({ length: 25 }, (_, h) => `${h.toString().padStart(2, '0')}:00`);
+  const formatAMPM = (timeStr) => {
+    if (!timeStr) return 'None';
+    if (timeStr === '24:00') return '12:00 AM';
+    const [h] = timeStr.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
+    return `${hour12.toString().padStart(2, '0')}:00 ${period}`;
+  };
 
   const fetchData = async () => {
     try {
@@ -46,8 +57,8 @@ const AdminDashboard = () => {
     } catch (error) { toast.error('Failed to load admin data'); }
   };
 
-  useEffect(() => { 
-    fetchData(); 
+  useEffect(() => {
+    fetchData();
     window.addEventListener('refreshBookings', fetchData);
     return () => window.removeEventListener('refreshBookings', fetchData);
   }, []);
@@ -74,7 +85,10 @@ const AdminDashboard = () => {
         amenities: [],
         paymentBank: '', paymentAccountTitle: '', paymentAccountNumber: '', advanceRequired: '',
         operationalStartTime: '00:00', operationalEndTime: '24:00',
-        pricePerHour: '', priceWeekend: '', managerName: '', managerEmail: '', managerMobile: '', notificationEmail: ''
+        pricePerHour: '', minSlots: 1,
+        pricePeak: '', peakStartTime: '', peakEndTime: '',
+        discountPercentage: '', discountValidUntil: '', discountTargetTier: 'both',
+        managerName: '', managerEmail: '', managerMobile: '', notificationEmail: ''
       });
       setImages([]);
       fetchData();
@@ -101,9 +115,9 @@ const AdminDashboard = () => {
   };
 
   const handleDelete = async (id) => {
-    if(window.confirm('Delete Court & Manager?')) {
-        try { await API.delete(`/admin/court/${id}`); toast.success('Deleted'); fetchData(); } 
-        catch (error) { toast.error('Failed'); }
+    if (window.confirm('Delete Court & Manager?')) {
+      try { await API.delete(`/admin/court/${id}`); toast.success('Deleted'); fetchData(); }
+      catch (error) { toast.error('Failed'); }
     }
   };
 
@@ -118,9 +132,9 @@ const AdminDashboard = () => {
     const password = window.prompt("Enter Initial Password for Manager:");
     if (!password) return;
     try {
-        const res = await API.post('/admin/assign-manager', { courtId, managerName: name, managerEmail: email, managerMobile: mobile, notificationEmail: notifEmail, password });
-        toast.success(`Assigned! Password: ${res.data.manager.password}`);
-        fetchData();
+      const res = await API.post('/admin/assign-manager', { courtId, managerName: name, managerEmail: email, managerMobile: mobile, notificationEmail: notifEmail, password });
+      toast.success(`Assigned! Password: ${res.data.manager.password}`);
+      fetchData();
     } catch (error) { toast.error(error.response?.data?.message || 'Failed'); }
   };
 
@@ -128,8 +142,8 @@ const AdminDashboard = () => {
     const newPassword = window.prompt("Enter New Password for Manager:");
     if (!newPassword) return;
     try {
-        await API.post('/admin/reset-manager-password', { managerId, newPassword });
-        toast.success('Password updated!');
+      await API.post('/admin/reset-manager-password', { managerId, newPassword });
+      toast.success('Password updated!');
     } catch (error) { toast.error('Failed to update password'); }
   };
 
@@ -146,7 +160,7 @@ const AdminDashboard = () => {
           <p style={{ color: '#9ca3af', marginTop: '4px', fontSize: '1rem' }}>Global facility management and system-wide analytics.</p>
         </div>
       </div>
-      
+
       {/* STATS OVERVIEW */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
         <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.08)', position: 'relative', overflow: 'hidden' }}>
@@ -173,9 +187,9 @@ const AdminDashboard = () => {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '2rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
-        <button 
+        <button
           onClick={() => setActiveTab('courts')}
-          style={{ 
+          style={{
             background: activeTab === 'courts' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
             color: activeTab === 'courts' ? '#3b82f6' : '#6b7280',
             border: 'none',
@@ -192,9 +206,9 @@ const AdminDashboard = () => {
         >
           <Building2 size={18} /> Facility Management
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('disputes')}
-          style={{ 
+          style={{
             background: activeTab === 'disputes' ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
             color: activeTab === 'disputes' ? '#ef4444' : '#6b7280',
             border: 'none',
@@ -210,11 +224,11 @@ const AdminDashboard = () => {
           }}
         >
           <AlertTriangle size={18} /> Resolution Center
-          <span style={{ 
-            background: '#ef4444', 
-            color: 'white', 
-            fontSize: '0.6rem', 
-            padding: '2px 6px', 
+          <span style={{
+            background: '#ef4444',
+            color: 'white',
+            fontSize: '0.6rem',
+            padding: '2px 6px',
             borderRadius: '6px',
             marginLeft: '4px'
           }}>
@@ -239,7 +253,7 @@ const AdminDashboard = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px' }}><Home size={14} /> COURT NAME</label>
-                    <input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.courtName} onChange={e=>setForm({...form, courtName:e.target.value})} placeholder="The Arena" required />
+                    <input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.courtName} onChange={e => setForm({ ...form, courtName: e.target.value })} placeholder="The Arena" required />
                   </div>
                   <div className="form-group">
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px' }}><Layers size={14} /> SPORTS FACILITIES</label>
@@ -251,38 +265,144 @@ const AdminDashboard = () => {
                   </div>
                 </div>
                 <div style={{ marginTop: '1rem' }}>
-                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px' }}><MapPin size={14} /> LOCATION & MAP</label>
-                   <div style={{ display: 'grid', gap: '10px' }}>
-                     <input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.location} onChange={e=>setForm({...form, location:e.target.value})} placeholder="Street, Area, City..." required />
-                     <input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%', fontSize: '0.8rem' }} value={form.googleMapLink} onChange={e=>setForm({...form, googleMapLink:e.target.value})} placeholder="Google Maps Embed Link (Optional)" />
-                   </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px' }}><MapPin size={14} /> LOCATION & MAP</label>
+                  <div style={{ display: 'grid', gap: '10px' }}>
+                    <input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="Street, Area, City..." required />
+                    <input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%', fontSize: '0.8rem' }} value={form.googleMapLink} onChange={e => setForm({ ...form, googleMapLink: e.target.value })} placeholder="Google Maps Embed Link (Optional)" />
+                  </div>
                 </div>
               </div>
 
               {/* Pricing & Amenities */}
               <div>
                 <h3 style={{ fontSize: '0.9rem', color: '#10b981', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1.25rem' }}>Pricing & Operations</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                
+                {/* Core Pricing & Limits */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                   <div className="form-group">
-                    <label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>WEEKDAY PRICE (PKR)</label>
-                    <input type="number" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.pricePerHour} onChange={e=>setForm({...form, pricePerHour:e.target.value})} required />
+                    <label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>BASE OFF-PEAK PRICE (PKR/hr)</label>
+                    <input type="number" placeholder="e.g. 4000" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.pricePerHour} onChange={e => setForm({ ...form, pricePerHour: e.target.value })} required />
                   </div>
                   <div className="form-group">
-                    <label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>WEEKEND PRICE (PKR)</label>
-                    <input type="number" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.priceWeekend} onChange={e=>setForm({...form, priceWeekend:e.target.value})} />
+                    <label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>MINIMUM CONSECUTIVE SLOTS</label>
+                    <input type="number" min="1" max="10" placeholder="Default: 1" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.minSlots} onChange={e => setForm({ ...form, minSlots: e.target.value })} required />
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+
+                {/* Operational Windows */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.2)', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <div className="form-group">
-                    <label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>OPENING TIME</label>
-                    <select style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.operationalStartTime} onChange={e=>setForm({...form, operationalStartTime:e.target.value})}>
-                      {hourOptions.slice(0, 24).map((h) => <option key={h} value={h}>{h}</option>)}
-                    </select>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#60a5fa', fontSize: '0.75rem', fontWeight: '800', marginBottom: '8px' }}>
+                      <Clock size={14} /> OPENING TIME: <span style={{ color: 'white', background: 'rgba(59, 130, 246, 0.2)', padding: '2px 6px', borderRadius: '4px' }}>{formatAMPM(form.operationalStartTime)}</span>
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', background: '#0f172a', padding: '8px', borderRadius: '10px', border: '1px solid #1e293b', maxHeight: '140px', overflowY: 'auto' }}>
+                      {hourOptions.slice(0, 24).map((h) => (
+                        <button
+                          key={h} type="button" onClick={() => setForm({ ...form, operationalStartTime: h })}
+                          style={{
+                            padding: '6px 2px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: '800', border: '1px solid',
+                            borderColor: form.operationalStartTime === h ? '#3b82f6' : 'transparent',
+                            background: form.operationalStartTime === h ? '#3b82f6' : 'transparent',
+                            color: form.operationalStartTime === h ? 'white' : '#9ca3af', cursor: 'pointer'
+                          }}
+                        >
+                          {formatAMPM(h)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div className="form-group">
-                    <label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>CLOSING TIME</label>
-                    <select style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.operationalEndTime} onChange={e=>setForm({...form, operationalEndTime:e.target.value})}>
-                      {hourOptions.slice(1).map((h) => <option key={h} value={h}>{h}</option>)}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#60a5fa', fontSize: '0.75rem', fontWeight: '800', marginBottom: '8px' }}>
+                      <Clock size={14} /> CLOSING TIME: <span style={{ color: 'white', background: 'rgba(59, 130, 246, 0.2)', padding: '2px 6px', borderRadius: '4px' }}>{formatAMPM(form.operationalEndTime)}</span>
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', background: '#0f172a', padding: '8px', borderRadius: '10px', border: '1px solid #1e293b', maxHeight: '140px', overflowY: 'auto' }}>
+                      {hourOptions.slice(1).map((h) => (
+                        <button
+                          key={h} type="button" onClick={() => setForm({ ...form, operationalEndTime: h })}
+                          style={{
+                            padding: '6px 2px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: '800', border: '1px solid',
+                            borderColor: form.operationalEndTime === h ? '#3b82f6' : 'transparent',
+                            background: form.operationalEndTime === h ? '#3b82f6' : 'transparent',
+                            color: form.operationalEndTime === h ? 'white' : '#9ca3af', cursor: 'pointer'
+                          }}
+                        >
+                          {formatAMPM(h)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Peak Pricing Configuration */}
+                <div style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '1.25rem', marginBottom: '1.5rem' }}>
+                  <label style={{ color: '#f59e0b', fontSize: '0.75rem', fontWeight: '900', display: 'block', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>⚡ Dynamic Peak Hour Configurations</label>
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label style={{ color: '#9ca3af', fontSize: '0.75rem', fontWeight: '700', marginBottom: '6px', display: 'block' }}>PEAK RATE (PKR/hr)</label>
+                    <input type="number" placeholder="e.g. 5000 (Optional)" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.pricePeak} onChange={e => setForm({ ...form, pricePeak: e.target.value })} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', background: 'rgba(245, 158, 11, 0.03)', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.1)' }}>
+                    <div className="form-group">
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f59e0b', fontSize: '0.75rem', fontWeight: '800', marginBottom: '8px' }}>
+                        START TIME: <span style={{ color: 'white', background: 'rgba(245, 158, 11, 0.2)', padding: '2px 6px', borderRadius: '4px' }}>{formatAMPM(form.peakStartTime)}</span>
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', background: '#0f172a', padding: '8px', borderRadius: '10px', border: '1px solid #1e293b', maxHeight: '140px', overflowY: 'auto' }}>
+                        {hourOptions.slice(0, 24).map((h) => (
+                          <button
+                            key={h} type="button" onClick={() => setForm({ ...form, peakStartTime: h })}
+                            style={{
+                              padding: '6px 2px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: '800', border: '1px solid',
+                              borderColor: form.peakStartTime === h ? '#f59e0b' : 'transparent',
+                              background: form.peakStartTime === h ? '#f59e0b' : 'transparent',
+                              color: form.peakStartTime === h ? 'white' : '#9ca3af', cursor: 'pointer'
+                            }}
+                          >
+                            {formatAMPM(h)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f59e0b', fontSize: '0.75rem', fontWeight: '800', marginBottom: '8px' }}>
+                        END TIME: <span style={{ color: 'white', background: 'rgba(245, 158, 11, 0.2)', padding: '2px 6px', borderRadius: '4px' }}>{formatAMPM(form.peakEndTime)}</span>
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', background: '#0f172a', padding: '8px', borderRadius: '10px', border: '1px solid #1e293b', maxHeight: '140px', overflowY: 'auto' }}>
+                        {hourOptions.slice(0, 24).map((h) => (
+                          <button
+                            key={h} type="button" onClick={() => setForm({ ...form, peakEndTime: h })}
+                            style={{
+                              padding: '6px 2px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: '800', border: '1px solid',
+                              borderColor: form.peakEndTime === h ? '#f59e0b' : 'transparent',
+                              background: form.peakEndTime === h ? '#f59e0b' : 'transparent',
+                              color: form.peakEndTime === h ? 'white' : '#9ca3af', cursor: 'pointer'
+                            }}
+                          >
+                            {formatAMPM(h)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Promotional Campaign Options */}
+                <div style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '1.25rem' }}>
+                  <label style={{ color: '#ec4899', fontSize: '0.75rem', fontWeight: '900', display: 'block', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>🏷️ Launch Promotion Discounts</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="form-group">
+                      <label style={{ color: '#9ca3af', fontSize: '0.75rem', fontWeight: '700', marginBottom: '6px', display: 'block' }}>DISCOUNT PERCENTAGE (%)</label>
+                      <input type="number" placeholder="e.g. 15" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.discountPercentage} onChange={e => setForm({ ...form, discountPercentage: e.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label style={{ color: '#9ca3af', fontSize: '0.75rem', fontWeight: '700', marginBottom: '6px', display: 'block' }}>CAMPAIGN EXPIRATION DATE</label>
+                      <input type="date" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.discountValidUntil} onChange={e => setForm({ ...form, discountValidUntil: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label style={{ color: '#9ca3af', fontSize: '0.75rem', fontWeight: '700', marginBottom: '6px', display: 'block' }}>PROMOTION TARGET SCOPE</label>
+                    <select style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: '#ec4899', fontWeight: '800', width: '100%' }} value={form.discountTargetTier} onChange={e => setForm({ ...form, discountTargetTier: e.target.value })}>
+                      <option value="both">Apply to Both Peak & Base Rates</option>
+                      <option value="base">Apply Only to Base Off-Peak Rate</option>
+                      <option value="peak">Apply Only to Dynamic Peak Rate</option>
                     </select>
                   </div>
                 </div>
@@ -300,31 +420,31 @@ const AdminDashboard = () => {
               <div>
                 <h3 style={{ fontSize: '0.9rem', color: '#facc15', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1.25rem' }}>Management & Finance</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                   <div className="form-group">
-                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px' }}><CreditCard size={14} /> BANK NAME</label>
-                     <input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.paymentBank} onChange={e=>setForm({...form, paymentBank:e.target.value})} required />
-                   </div>
-                   <div className="form-group">
-                     <label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>ADVANCE (PKR)</label>
-                     <input type="number" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.advanceRequired} onChange={e=>setForm({...form, advanceRequired:e.target.value})} placeholder="0" />
-                   </div>
+                  <div className="form-group">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px' }}><CreditCard size={14} /> BANK NAME</label>
+                    <input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.paymentBank} onChange={e => setForm({ ...form, paymentBank: e.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>ADVANCE (PKR)</label>
+                    <input type="number" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.advanceRequired} onChange={e => setForm({ ...form, advanceRequired: e.target.value })} placeholder="0" />
+                  </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
-                   <div className="form-group"><label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>ACCOUNT TITLE</label><input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.paymentAccountTitle} onChange={e=>setForm({...form, paymentAccountTitle:e.target.value})} required /></div>
-                   <div className="form-group"><label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>ACCOUNT NUMBER</label><input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.paymentAccountNumber} onChange={e=>setForm({...form, paymentAccountNumber:e.target.value})} required /></div>
+                  <div className="form-group"><label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>ACCOUNT TITLE</label><input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.paymentAccountTitle} onChange={e => setForm({ ...form, paymentAccountTitle: e.target.value })} required /></div>
+                  <div className="form-group"><label style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', display: 'block' }}>ACCOUNT NUMBER</label><input style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.paymentAccountNumber} onChange={e => setForm({ ...form, paymentAccountNumber: e.target.value })} required /></div>
                 </div>
                 <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '20px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.25rem' }}><Users size={18} color="#3b82f6" /><span style={{ fontWeight: '900', fontSize: '0.9rem', color: 'white' }}>Assigned Manager Account</span></div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div className="form-group"><input style={{ background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px', padding: '10px', color: 'white', width: '100%', fontSize: '0.85rem' }} value={form.managerName} onChange={e=>setForm({...form, managerName:e.target.value})} placeholder="Manager Name" required /></div>
-                  <div className="form-group"><input type="email" style={{ background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px', padding: '10px', color: 'white', width: '100%', fontSize: '0.85rem' }} value={form.managerEmail} onChange={e=>setForm({...form, managerEmail:e.target.value})} placeholder="Login Email (Demo)" required /></div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '10px' }}>
-                  <input type="tel" style={{ background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px', padding: '10px', color: 'white', width: '100%', fontSize: '0.85rem' }} value={form.managerMobile} onChange={e=>setForm({...form, managerMobile:e.target.value})} placeholder="Manager WhatsApp / Mobile" required />
-                  <input type="email" style={{ background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px', padding: '10px', color: 'white', width: '100%', fontSize: '0.85rem' }} value={form.notificationEmail} onChange={e=>setForm({...form, notificationEmail:e.target.value})} placeholder="Notification Email (Actual)" />
+                    <div className="form-group"><input style={{ background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px', padding: '10px', color: 'white', width: '100%', fontSize: '0.85rem' }} value={form.managerName} onChange={e => setForm({ ...form, managerName: e.target.value })} placeholder="Manager Name" required /></div>
+                    <div className="form-group"><input type="email" style={{ background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px', padding: '10px', color: 'white', width: '100%', fontSize: '0.85rem' }} value={form.managerEmail} onChange={e => setForm({ ...form, managerEmail: e.target.value })} placeholder="Login Email (Demo)" required /></div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '10px' }}>
+                    <input type="tel" style={{ background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px', padding: '10px', color: 'white', width: '100%', fontSize: '0.85rem' }} value={form.managerMobile} onChange={e => setForm({ ...form, managerMobile: e.target.value })} placeholder="Manager WhatsApp / Mobile" required />
+                    <input type="email" style={{ background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px', padding: '10px', color: 'white', width: '100%', fontSize: '0.85rem' }} value={form.notificationEmail} onChange={e => setForm({ ...form, notificationEmail: e.target.value })} placeholder="Notification Email (Actual)" />
+                  </div>
                 </div>
               </div>
-            </div>
 
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#9ca3af', fontSize: '0.8rem', fontWeight: '700', marginBottom: '10px' }}><Camera size={16} /> FACILITY IMAGES (MAX 5)</label>
@@ -349,7 +469,7 @@ const AdminDashboard = () => {
               <div style={{ padding: '10px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '12px' }}><Activity color="#10b981" /></div>
               <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: '900', color: 'white' }}>Active Network</h2>
             </div>
-            
+
             <div style={{ display: 'grid', gap: '1.25rem' }}>
               {data.courts.length === 0 && (
                 <div style={{ padding: '3rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '24px', border: '1px dashed rgba(255,255,255,0.1)' }}>
@@ -376,7 +496,7 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <button onClick={() => navigate(`/courts/${court._id}`)} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '10px', fontWeight: '800', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                         <ExternalLink size={14} /> Manage
@@ -412,9 +532,9 @@ const AdminDashboard = () => {
 
           {(!data.disputes || data.disputes.length === 0) ? (
             <div style={{ padding: '4rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '30px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-               <ShieldAlert size={48} color="#1e293b" style={{ marginBottom: '1.5rem' }} />
-               <h3 style={{ color: 'white', margin: 0 }}>All Clear</h3>
-               <p style={{ color: '#6b7280', marginTop: '8px' }}>No pending disputes require your attention at this moment.</p>
+              <ShieldAlert size={48} color="#1e293b" style={{ marginBottom: '1.5rem' }} />
+              <h3 style={{ color: 'white', margin: 0 }}>All Clear</h3>
+              <p style={{ color: '#6b7280', marginTop: '8px' }}>No pending disputes require your attention at this moment.</p>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1.5rem' }}>
@@ -451,7 +571,7 @@ const AdminDashboard = () => {
                   </div>
 
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <button 
+                    <button
                       onClick={async () => {
                         try {
                           await API.put(`/admin/disputes/${d._id}/resolve`);
@@ -466,7 +586,7 @@ const AdminDashboard = () => {
                       <ShieldAlert size={18} /> Mark as Resolved
                     </button>
                     <button style={{ background: 'rgba(255,255,255,0.05)', color: '#9ca3af', border: 'none', width: '45px', height: '45px', borderRadius: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                       <Smartphone size={18} />
+                      <Smartphone size={18} />
                     </button>
                   </div>
                 </div>

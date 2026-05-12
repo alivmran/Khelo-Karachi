@@ -22,8 +22,16 @@ const courtSchema = mongoose.Schema({
   advanceRequired: { type: Number, default: 0 },
   operationalStartTime: { type: String, default: '00:00' },
   operationalEndTime: { type: String, default: '24:00' },
-  pricePerHour: { type: Number, required: true }, // Weekday Price
-  priceWeekend: { type: Number }, // New: Weekend Price
+  pricePerHour: { type: Number, required: true }, // Base Off-Peak Price
+  minSlots: { type: Number, default: 1 },
+  discount: {
+    percentage: { type: Number, default: 0 },
+    validUntil: { type: Date },
+    targetTier: { type: String, enum: ['both', 'base', 'peak'], default: 'both' }
+  },
+  peakStartTime: { type: String },
+  peakEndTime: { type: String },
+  pricePeak: { type: Number },
   description: { type: String },
   images: [{ type: String }], 
   amenities: [{ type: String }], 

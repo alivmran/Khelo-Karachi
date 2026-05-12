@@ -3,6 +3,7 @@ const router = express.Router();
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const { protect, manager } = require('../middleware/authMiddleware');
+const { upload } = require('../config/cloudinary');
 const { sendEmail } = require('../utils/emailService');
 
 const parseHour = (timeString) => {
@@ -101,7 +102,7 @@ router.post('/block', protect, manager, async (req, res, next) => {
 
 router.put('/booking/:id', protect, manager, async (req, res, next) => {
   try {
-    const { status } = req.body;
+    const { status, requireRefund } = req.body;
     if (!['Approved', 'Rejected'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
@@ -112,7 +113,16 @@ router.put('/booking/:id', protect, manager, async (req, res, next) => {
     const booking = await Booking.findOne({ _id: req.params.id, court: court._id });
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
-    booking.status = status === 'Rejected' ? 'Awaiting Refund Details' : status;
+    if (status === 'Rejected') {
+      if (requireRefund === false) {
+        booking.status = 'Rejected';
+        booking.disputeReason = 'Rejected due to invalid or incorrect payment screenshot.';
+      } else {
+        booking.status = 'Awaiting Refund Details';
+      }
+    } else {
+      booking.status = status;
+    }
     await booking.save();
 
     const bookingUser = await require('../models/User').findById(booking.user);
@@ -120,7 +130,9 @@ router.put('/booking/:id', protect, manager, async (req, res, next) => {
       const subject = status === 'Approved' ? 'Booking Approved' : 'Booking Rejected';
       const msgBody = status === 'Approved' ? 
         `Your booking at ${court.name} has been approved. Enjoy your game!` : 
-        `Your booking at ${court.name} was rejected. Please log in and provide refund details.`;
+        (requireRefund === false ?
+          `Your booking at ${court.name} was rejected due to an invalid/incorrect payment screenshot. No refund workflow applies.` :
+          `Your booking at ${court.name} was rejected. Please log in and provide refund details.`);
       sendEmail(bookingUser.email, subject, subject, msgBody);
     }
 
@@ -138,6 +150,80 @@ router.put('/booking/:id', protect, manager, async (req, res, next) => {
     }
 
     res.json(booking);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/update-pricing', protect, manager, async (req, res, next) => {
+  try {
+    const court = await Court.findOne({ manager: req.user._id });
+    if (!court) return res.status(404).json({ message: 'No court assigned' });
+
+    const { discountPercentage, discountValidUntil, discountTargetTier, peakStartTime, peakEndTime, pricePeak } = req.body;
+    court.discount = {
+      percentage: Number(discountPercentage) || 0,
+      validUntil: discountValidUntil ? new Date(discountValidUntil) : null,
+      targetTier: discountTargetTier || 'both'
+    };
+    court.peakStartTime = peakStartTime || '';
+    court.peakEndTime = peakEndTime || '';
+    if (pricePeak !== undefined && pricePeak !== '') {
+      court.pricePeak = Number(pricePeak);
+    } else {
+      court.pricePeak = undefined;
+    }
+
+    await court.save();
+    res.json(court);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/court-details', protect, manager, upload.array('images', 5), async (req, res, next) => {
+  try {
+    const court = await Court.findOne({ manager: req.user._id });
+    if (!court) return res.status(404).json({ message: 'No court assigned' });
+
+    if (req.body.name) court.name = req.body.name;
+    if (req.body.location !== undefined) court.location = req.body.location;
+    
+    if (req.body.facilities) {
+      court.facilities = Array.isArray(req.body.facilities) ? req.body.facilities : [req.body.facilities];
+    } else if (req.body.facilities === '') {
+      court.facilities = [];
+    }
+
+    if (req.body.amenities) {
+      court.amenities = Array.isArray(req.body.amenities) ? req.body.amenities : [req.body.amenities];
+    } else if (req.body.amenities === '') {
+      court.amenities = [];
+    }
+
+    if (req.body.paymentBank !== undefined) court.paymentBank = req.body.paymentBank;
+    if (req.body.paymentAccountTitle !== undefined) court.paymentAccountTitle = req.body.paymentAccountTitle;
+    if (req.body.paymentAccountNumber !== undefined) court.paymentAccountNumber = req.body.paymentAccountNumber;
+    if (req.body.advanceRequired !== undefined) court.advanceRequired = Number(req.body.advanceRequired) || 0;
+
+    if (req.body.pricePerHour !== undefined && req.body.pricePerHour !== '') {
+      court.pricePerHour = Number(req.body.pricePerHour);
+    }
+    
+    if (req.body.peakStartTime !== undefined) court.peakStartTime = req.body.peakStartTime;
+    if (req.body.peakEndTime !== undefined) court.peakEndTime = req.body.peakEndTime;
+    if (req.body.pricePeak !== undefined && req.body.pricePeak !== '') {
+      court.pricePeak = Number(req.body.pricePeak);
+    } else if (req.body.pricePeak === '') {
+      court.pricePeak = undefined;
+    }
+
+    if (req.files && req.files.length > 0) {
+      court.images = req.files.map(file => file.path);
+    }
+
+    await court.save();
+    res.json(court);
   } catch (error) {
     next(error);
   }

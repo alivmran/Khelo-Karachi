@@ -55,7 +55,13 @@ router.post('/create-court', protect, admin, upload.array('images', 5), async (r
       operationalStartTime,
       operationalEndTime,
       pricePerHour,
-      priceWeekend,
+      minSlots,
+      discountPercentage,
+      discountValidUntil,
+      discountTargetTier,
+      peakStartTime,
+      peakEndTime,
+      pricePeak,
       managerName,
       managerEmail,
       managerMobile,
@@ -100,7 +106,15 @@ router.post('/create-court', protect, admin, upload.array('images', 5), async (r
         operationalStartTime: operationalStartTime || '00:00',
         operationalEndTime: operationalEndTime || '24:00',
         pricePerHour,
-        priceWeekend: priceWeekend || pricePerHour, 
+        minSlots: Number(minSlots) || 1,
+        discount: {
+          percentage: Number(discountPercentage) || 0,
+          validUntil: discountValidUntil ? new Date(discountValidUntil) : null,
+          targetTier: discountTargetTier || 'both'
+        },
+        peakStartTime: peakStartTime || '',
+        peakEndTime: peakEndTime || '',
+        pricePeak: pricePeak ? Number(pricePeak) : undefined,
         manager: manager._id, 
         notificationEmail,
         images: imageUrls
@@ -205,6 +219,13 @@ router.put('/court/:id', protect, admin, upload.array('images', 5), async (req, 
         if (req.files && req.files.length > 0) {
           const imageUrls = req.files.map(file => file.path);
           updateData.images = imageUrls;
+        }
+        if (req.body.discountPercentage !== undefined || req.body.discountValidUntil !== undefined || req.body.discountTargetTier !== undefined) {
+          updateData.discount = {
+            percentage: Number(req.body.discountPercentage) || 0,
+            validUntil: req.body.discountValidUntil ? new Date(req.body.discountValidUntil) : null,
+            targetTier: req.body.discountTargetTier || 'both'
+          };
         }
         const court = await Court.findByIdAndUpdate(req.params.id, updateData, { new: true });
         res.json(court);

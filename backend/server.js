@@ -89,8 +89,8 @@ cron.schedule('*/30 * * * *', async () => {
     const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
     const result = await Booking.updateMany(
       {
-        status: 'Pending',
-        transactionIdShort: { $exists: false },
+        status: { $in: ['Awaiting Payment', 'Pending'] },
+        paymentScreenshot: { $exists: false },
         createdAt: { $lte: thirtyMinsAgo }
       },
       {

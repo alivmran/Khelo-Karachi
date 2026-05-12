@@ -11,7 +11,9 @@ import {
   Sparkles, 
   CheckCircle2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  UploadCloud,
+  X
 } from 'lucide-react';
 
 const to12Hour = (time24 = '00:00') => {
@@ -28,6 +30,12 @@ const parseHour = (timeString, fallback) => {
   const [h] = timeString.split(':').map(Number);
   if (Number.isNaN(h)) return fallback;
   return h;
+};
+
+const parseHourHelper = (timeString) => {
+  if (!timeString || typeof timeString !== 'string') return null;
+  const [h] = timeString.split(':').map(Number);
+  return Number.isNaN(h) ? null : h;
 };
 
 const getEmbedMapUrl = (url) => {
@@ -89,8 +97,8 @@ const CourtDetails = () => {
   const [unavailableSlots, setUnavailableSlots] = useState([]);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [newBookingIds, setNewBookingIds] = useState([]);
-  const [senderName, setSenderName] = useState('');
-  const [transactionIdShort, setTransactionIdShort] = useState('');
+  const [paymentScreenshot, setPaymentScreenshot] = useState(null);
+  const [screenshotPreview, setScreenshotPreview] = useState('');
 
   // --- MANAGER LOGIC ---
   useEffect(() => {
@@ -116,10 +124,7 @@ const CourtDetails = () => {
 
   useEffect(() => {
     if (date && court && facility) {
-      const day = new Date(date).getDay();
-      const isWeekend = (day === 0 || day === 6);
-      if (isWeekend && court.priceWeekend) setActivePrice(court.priceWeekend);
-      else setActivePrice(court.pricePerHour);
+      setActivePrice(court.pricePerHour || 0);
 
       const fetchAvailability = async () => {
         try {
@@ -132,11 +137,41 @@ const CourtDetails = () => {
     }
   }, [date, court, facility]);
 
+  const calculateTotal = () => {
+    if (!court) return 0;
+    let sum = 0;
+    const isDiscountActive = court.discount?.percentage > 0 && 
+      (!court.discount.validUntil || new Date() <= new Date(court.discount.validUntil));
+
+    for (let slotStr of selectedSlots) {
+      const startH = parseHourHelper(slotStr.split('-')[0]);
+      let base = court.pricePerHour || 0;
+      if (court.pricePeak && court.peakStartTime && court.peakEndTime) {
+        const pHStart = parseHourHelper(court.peakStartTime);
+        const pHEnd = parseHourHelper(court.peakEndTime);
+        if (pHStart !== null && pHEnd !== null && startH >= pHStart && startH < pHEnd) {
+          base = court.pricePeak;
+        }
+      }
+      if (isDiscountActive) {
+        base = Math.round(base * (1 - court.discount.percentage / 100));
+      }
+      sum += base;
+    }
+    return sum;
+  };
+
+  const calculatedTotalPrice = calculateTotal();
+
   const handleBooking = async (e) => {
     e.preventDefault();
     if (!user) { navigate('/login'); return; }
     if (selectedSlots.length === 0) {
       toast.error('Please select at least one time slot');
+      return;
+    }
+    if (selectedSlots.length < (court?.minSlots || 1)) {
+      toast.error(`This venue requires a minimum booking of ${court?.minSlots} consecutive hours.`);
       return;
     }
     if (!facility) {
@@ -164,34 +199,44 @@ const CourtDetails = () => {
 
     try {
       const timeBlocks = groupTimeSlots(selectedSlots);
-      const totalPrice = activePrice * selectedSlots.length;
-      const { data } = await API.post('/bookings', { courtId: id, date, facility, timeBlocks, totalPrice });
+      const { data } = await API.post('/bookings', { courtId: id, date, facility, timeBlocks, totalPrice: calculatedTotalPrice });
       setNewBookingIds(data.map((b) => b._id));
       setPaymentModalOpen(true);
       toast.info('Booking placed. Complete payment proof to move it to pending approval.');
     } catch (error) { toast.error(error.response?.data?.message || 'Failed'); }
   };
 
-  const handleSubmitPaymentProof = async () => {
-    if (!senderName.trim()) {
-      toast.error('Please enter sender account name');
-      return;
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPaymentScreenshot(file);
+      setScreenshotPreview(URL.createObjectURL(file));
     }
-    if (!/^\d{4}$/.test(transactionIdShort)) {
-      toast.error('Please enter exactly 4 digits for TID');
+  };
+
+  const removeScreenshot = () => {
+    setPaymentScreenshot(null);
+    setScreenshotPreview('');
+  };
+
+  const handleSubmitPaymentProof = async () => {
+    if (!paymentScreenshot) {
+      toast.error('Please upload a screenshot of your payment transfer');
       return;
     }
     try {
       await Promise.all(
-        newBookingIds.map((bookingId) =>
-          API.put(`/bookings/${bookingId}/submit-payment-proof`, {
-            senderName,
-            transactionIdShort
-          })
-        )
+        newBookingIds.map((bookingId) => {
+          const formData = new FormData();
+          formData.append('paymentScreenshot', paymentScreenshot);
+          return API.put(`/bookings/${bookingId}/submit-payment-proof`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+        })
       );
       toast.success('Payment proof submitted. Booking is now pending manager approval.');
       setPaymentModalOpen(false);
+      removeScreenshot();
       navigate('/profile');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to submit payment proof');
@@ -315,7 +360,15 @@ const CourtDetails = () => {
               <div className="book-slot-container">
                 <div className="book-slot-header">
                   <h3>Book Slot</h3>
-                  <div className="price-display">PKR {activePrice * (selectedSlots.length || 1)} <span>{selectedSlots.length > 0 ? '/ total' : '/ hr'}</span></div>
+                  <div className="price-display">
+                    PKR {selectedSlots.length > 0 ? calculatedTotalPrice : (court?.pricePerHour || 0)} 
+                    <span>{selectedSlots.length > 0 ? ' / total' : ' / base hr'}</span>
+                  </div>
+                  {court?.minSlots >= 2 && (
+                    <div style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#f59e0b', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      ⚡ Minimum Booking: {court.minSlots} consecutive hours
+                    </div>
+                  )}
                 </div>
                 <form onSubmit={handleBooking}>
                   <div className="form-group">
@@ -325,8 +378,15 @@ const CourtDetails = () => {
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>Date</label>
-                    <input type="date" min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]} value={date} onChange={e => setDate(e.target.value)} required />
+                    <label>Date <span style={{fontSize:'0.75rem', color:'#aaa', fontWeight:'normal'}}>(Max 4 weeks ahead)</span></label>
+                    <input 
+                      type="date" 
+                      min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]} 
+                      max={new Date(Date.now() + 28 * 86400000 - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
+                      value={date} 
+                      onChange={e => setDate(e.target.value)} 
+                      required 
+                    />
                   </div>
                   {date && (
                     <div className="form-group">
@@ -338,6 +398,7 @@ const CourtDetails = () => {
                         startHour={parseHour(court.operationalStartTime, 0)}
                         endHour={parseHour(court.operationalEndTime, 24)}
                         selectedDate={date}
+                        court={court}
                       />
                     </div>
                   )}
@@ -358,23 +419,37 @@ const CourtDetails = () => {
           <div className="modal-content">
             <h3 style={{ marginBottom: '10px' }}>Awaiting Payment</h3>
             <p style={{ color: '#ccc', marginBottom: '12px' }}>Send payment now, then submit proof to continue for manager approval.</p>
-            <div style={{ padding: '12px', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', marginBottom: '12px', background: 'rgba(16,185,129,0.08)' }}>
+            <div style={{ padding: '12px', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', marginBottom: '16px', background: 'rgba(16,185,129,0.08)' }}>
               <p style={{ margin: '6px 0', color: '#cfcfcf' }}>Advance Amount: PKR {court.advanceRequired || 0}</p>
               <p style={{ margin: '6px 0', color: '#cfcfcf' }}>Bank: {court.paymentBank || '-'}</p>
               <p style={{ margin: '6px 0', color: '#cfcfcf' }}>Account Title: {court.paymentAccountTitle || '-'}</p>
               <p style={{ margin: '6px 0', color: '#cfcfcf' }}>Account Number: {court.paymentAccountNumber || '-'}</p>
             </div>
-            <div className="form-group">
-              <label>Sender Account Name</label>
-              <input value={senderName} onChange={e => setSenderName(e.target.value)} />
+            
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '0.85rem' }}>Payment Transfer Screenshot</label>
+              {screenshotPreview ? (
+                <div className="screenshot-preview-wrapper">
+                  <img src={screenshotPreview} alt="Screenshot preview" className="screenshot-preview-img" />
+                  <button type="button" className="remove-screenshot-btn" onClick={removeScreenshot} title="Remove image">
+                    <X size={18} />
+                  </button>
+                </div>
+              ) : (
+                <div className="screenshot-uploader-area">
+                  <input type="file" accept="image/jpeg,image/png,image/jpg" onChange={handleFileChange} />
+                  <div className="uploader-icon">
+                    <UploadCloud size={28} />
+                  </div>
+                  <p className="uploader-title">Click to upload screenshot</p>
+                  <p className="uploader-subtitle">Supports JPEG, PNG, JPG</p>
+                </div>
+              )}
             </div>
-            <div className="form-group">
-              <label>Last 4 Digits of TID</label>
-              <input value={transactionIdShort} onChange={e => setTransactionIdShort(e.target.value.replace(/\D/g, '').slice(0, 4))} maxLength="4" pattern="\d{4}" title="Please enter exactly 4 numbers" />
-            </div>
+
             <div className="modal-actions">
               <button className="confirm-btn" onClick={handleSubmitPaymentProof}>Submit Payment Proof</button>
-              <button className="cancel-btn" onClick={() => setPaymentModalOpen(false)}>Close</button>
+              <button className="cancel-btn" onClick={() => { setPaymentModalOpen(false); removeScreenshot(); }}>Close</button>
             </div>
           </div>
         </div>

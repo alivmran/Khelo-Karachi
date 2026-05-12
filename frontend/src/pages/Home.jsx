@@ -42,6 +42,12 @@ const isCurrentlyOpen = (start = '00:00', end = '23:59') => {
   return currentTime >= startTime && currentTime <= endTime;
 };
 
+const parseHourHelper = (timeString) => {
+  if (!timeString || typeof timeString !== 'string') return null;
+  const [h] = timeString.split(':').map(Number);
+  return Number.isNaN(h) ? null : h;
+};
+
 const Home = () => {
   const [courts, setCourts] = useState([]);
   const [filteredCourts, setFilteredCourts] = useState([]);
@@ -166,7 +172,28 @@ const Home = () => {
         gap: '2.5rem',
         marginBottom: '4rem'
       }}>
-        {filteredCourts.map((court) => (
+        {filteredCourts.map((court) => {
+          const currentH = new Date().getHours();
+          let isLivePeak = false;
+          let liveBasePrice = court.pricePerHour || 0;
+          if (court.pricePeak && court.peakStartTime && court.peakEndTime) {
+            const pS = parseHourHelper(court.peakStartTime);
+            const pE = parseHourHelper(court.peakEndTime);
+            if (pS !== null && pE !== null && currentH >= pS && currentH < pE) {
+              isLivePeak = true;
+              liveBasePrice = court.pricePeak;
+            }
+          }
+
+          const isDiscountActive = court.discount?.percentage > 0 && 
+            (!court.discount.validUntil || new Date() <= new Date(court.discount.validUntil));
+          
+          let livePrice = liveBasePrice;
+          if (isDiscountActive) {
+            livePrice = Math.round(liveBasePrice * (1 - court.discount.percentage / 100));
+          }
+
+          return (
           <div 
             key={court._id} 
             style={{
@@ -206,8 +233,15 @@ const Home = () => {
                   </div>
                 )}
                 
+                {/* Premium Promo Ribbon */}
+                {isDiscountActive && (
+                  <div className="theme-discount-ribbon">
+                    {court.discount.percentage}% OFF
+                  </div>
+                )}
+
                 {/* Floating Badges */}
-                <div style={{ position: 'absolute', top: '16px', left: '16px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'absolute', top: '16px', left: '16px', display: 'flex', gap: '6px', flexWrap: 'wrap', zIndex: 5 }}>
                   {(court.facilities || []).map(f => (
                     <span key={f} style={{ 
                       background: 'rgba(15, 23, 42, 0.8)', 
@@ -261,9 +295,26 @@ const Home = () => {
 
                 <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>Starting from</span>
-                    <div style={{ color: 'white', fontSize: '1.25rem', fontWeight: '900' }}>
-                      PKR {court.pricePerHour} <span style={{ fontSize: '0.8rem', color: '#6b7280', fontWeight: '500' }}>/hr</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                      <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>Live Rate</span>
+                      {isLivePeak && (
+                        <span style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', fontSize: '0.65rem', fontWeight: '900', padding: '2px 6px', borderRadius: '4px' }}>
+                          ⚡ PEAK HOUR
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ color: 'white', fontSize: '1.25rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {isDiscountActive ? (
+                        <>
+                          <span style={{ textDecoration: 'line-through', color: '#6b7280', fontSize: '0.9rem', fontWeight: '600' }}>
+                            PKR {liveBasePrice}
+                          </span>
+                          <span style={{ color: '#10b981' }}>PKR {livePrice}</span>
+                        </>
+                      ) : (
+                        <span>PKR {livePrice}</span>
+                      )}
+                      <span style={{ fontSize: '0.8rem', color: '#6b7280', fontWeight: '500' }}>/hr</span>
                     </div>
                   </div>
                   <button style={{ 
@@ -285,7 +336,8 @@ const Home = () => {
                 </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         {filteredCourts.length === 0 && (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '5rem 0' }}>
             <Search size={48} color="#1e293b" style={{ marginBottom: '1.5rem' }} />

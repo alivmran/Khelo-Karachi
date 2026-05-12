@@ -18,4 +18,9 @@ const matchPostSchema = mongoose.Schema({
   status: { type: String, enum: ['Open', 'Closed'], default: 'Open' }
 }, { timestamps: true });
 
+// Optimize multi-user matchmaking fetch speeds
+matchPostSchema.index({ user: 1, status: 1 });
+matchPostSchema.index({ challengerUser: 1, status: 1 });
+matchPostSchema.index({ court: 1, date: 1 });
+
 module.exports = mongoose.model('MatchPost', matchPostSchema);

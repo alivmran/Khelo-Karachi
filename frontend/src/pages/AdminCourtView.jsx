@@ -20,7 +20,10 @@ import {
   Clock, 
   Image as ImageIcon,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Eye,
+  Download,
+  X
 } from 'lucide-react';
 
 const parseHour = (timeString, fallback) => {
@@ -38,7 +41,34 @@ const AdminCourtView = ({ courtId }) => {
   const [blockForm, setBlockForm] = useState({ date: '', facility: '', timeBlocks: [] });
   const [unavailableSlots, setUnavailableSlots] = useState([]);
   const [images, setImages] = useState([]);
+  const [previewImage, setPreviewImage] = useState(null);
   const hourOptions = Array.from({ length: 25 }, (_, h) => `${h.toString().padStart(2, '0')}:00`);
+  const formatAMPM = (timeStr) => {
+    if (!timeStr) return 'None';
+    if (timeStr === '24:00') return '12:00 AM';
+    const [h] = timeStr.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
+    return `${hour12.toString().padStart(2, '0')}:00 ${period}`;
+  };
+
+  const handleDownloadScreenshot = async (url, bookingId) => {
+    try {
+      toast.info('Downloading screenshot...');
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `payment_screenshot_${bookingId}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      window.open(url, '_blank');
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,7 +86,13 @@ const AdminCourtView = ({ courtId }) => {
             paymentAccountNumber: data.court.paymentAccountNumber || '',
             advanceRequired: data.court.advanceRequired || 0,
             pricePerHour: data.court.pricePerHour,
-            priceWeekend: data.court.priceWeekend,
+            minSlots: data.court.minSlots || 1,
+            discountPercentage: data.court.discount?.percentage || 0,
+            discountValidUntil: data.court.discount?.validUntil ? data.court.discount.validUntil.split('T')[0] : '',
+            discountTargetTier: data.court.discount?.targetTier || 'both',
+            peakStartTime: data.court.peakStartTime || '',
+            peakEndTime: data.court.peakEndTime || '',
+            pricePeak: data.court.pricePeak || '',
             description: data.court.description,
             operationalStartTime: data.court.operationalStartTime || '00:00',
             operationalEndTime: data.court.operationalEndTime || '24:00'
@@ -260,6 +296,7 @@ const AdminCourtView = ({ courtId }) => {
                             <th style={{ padding: '1rem', border: 'none', color: '#6b7280', fontSize: '0.75rem', fontWeight: '900', textTransform: 'uppercase' }}>User / Athlete</th>
                             <th style={{ padding: '1rem', border: 'none', color: '#6b7280', fontSize: '0.75rem', fontWeight: '900', textTransform: 'uppercase' }}>Schedule</th>
                             <th style={{ padding: '1rem', border: 'none', color: '#6b7280', fontSize: '0.75rem', fontWeight: '900', textTransform: 'uppercase' }}>Facility Type</th>
+                            <th style={{ padding: '1rem', border: 'none', color: '#6b7280', fontSize: '0.75rem', fontWeight: '900', textTransform: 'uppercase' }}>Payment Proof</th>
                             <th style={{ padding: '1rem', border: 'none', color: '#6b7280', fontSize: '0.75rem', fontWeight: '900', textTransform: 'uppercase' }}>Current Status</th>
                           </tr>
                         </thead>
@@ -282,7 +319,29 @@ const AdminCourtView = ({ courtId }) => {
                                       <div style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: '700' }}>{b.startTime} - {b.endTime}</div>
                                     </td>
                                     <td style={{ padding: '1.25rem', border: 'none' }}>
-                                      <span style={{ background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '8px', color: '#9ca3af', fontSize: '0.8rem', fontWeight: '800' }}>{b.type.toUpperCase()}</span>
+                                      <span style={{ background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '8px', color: '#60a5fa', fontSize: '0.8rem', fontWeight: '800' }}>{(b.facility || b.type).toUpperCase()}</span>
+                                    </td>
+                                    <td style={{ padding: '1.25rem', border: 'none' }}>
+                                      {b.paymentScreenshot ? (
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                          <button 
+                                            type="button" 
+                                            onClick={() => setPreviewImage(b.paymentScreenshot)}
+                                            style={{ background: 'rgba(59,130,246,0.1)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.2)', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', fontWeight: '800' }}
+                                          >
+                                            <Eye size={12} /> View
+                                          </button>
+                                          <button 
+                                            type="button" 
+                                            onClick={() => handleDownloadScreenshot(b.paymentScreenshot, b._id)}
+                                            style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', fontWeight: '800' }}
+                                          >
+                                            <Download size={12} /> Save
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <span style={{ color: '#6b7280', fontSize: '0.75rem', fontStyle: 'italic' }}>N/A</span>
+                                      )}
                                     </td>
                                     <td style={{ padding: '1.25rem', border: 'none', borderRadius: '0 12px 12px 0' }}>
                                       <span className={`status ${b.status.toLowerCase()}`} style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '900' }}>{b.status.toUpperCase()}</span>
@@ -290,7 +349,7 @@ const AdminCourtView = ({ courtId }) => {
                                 </tr>
                             ))}
                             {data.bookings.length === 0 && (
-                              <tr><td colSpan="4" style={{ textAlign: 'center', padding: '4rem', color: '#6b7280' }}>No active bookings found for this court.</td></tr>
+                              <tr><td colSpan="5" style={{ textAlign: 'center', padding: '4rem', color: '#6b7280' }}>No active bookings found for this court.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -352,14 +411,95 @@ const AdminCourtView = ({ courtId }) => {
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
-                        <div className="form-group">
-                          <label style={{ marginBottom: '0.75rem', display: 'block', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>WEEKDAY PRICE (PKR)</label>
-                          <input style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.pricePerHour} onChange={e=>setEditForm({...editForm, pricePerHour:e.target.value})} />
+                      <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '24px', marginBottom: '2.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <h4 style={{ color: '#60a5fa', marginBottom: '1.25rem', marginTop: 0, fontSize: '0.95rem', fontWeight: '800' }}>
+                          ⚡ PRICING & OPERATIONAL CONSTRAINTS
+                        </h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                          <div className="form-group">
+                            <label style={{ marginBottom: '0.75rem', display: 'block', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>BASE PRICE PER HOUR (PKR)</label>
+                            <input type="number" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.pricePerHour || ''} onChange={e=>setEditForm({...editForm, pricePerHour:e.target.value})} required />
+                          </div>
+                          <div className="form-group">
+                            <label style={{ marginBottom: '0.75rem', display: 'block', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>MINIMUM CONSECUTIVE SLOTS</label>
+                            <input type="number" min="1" max="12" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.minSlots || 1} onChange={e=>setEditForm({...editForm, minSlots:e.target.value})} required />
+                          </div>
                         </div>
-                        <div className="form-group">
-                          <label style={{ marginBottom: '0.75rem', display: 'block', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>WEEKEND PRICE (PKR)</label>
-                          <input style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.priceWeekend} onChange={e=>setEditForm({...editForm, priceWeekend:e.target.value})} />
+
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.25rem', marginBottom: '1.5rem' }}>
+                          <label style={{ marginBottom: '1rem', display: 'block', color: '#ec4899', fontWeight: '800', fontSize: '0.85rem' }}>🏷️ PROMOTIONAL CAMPAIGN CONTROL</label>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
+                            <div className="form-group">
+                              <label style={{ marginBottom: '0.75rem', display: 'block', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>DISCOUNT PERCENTAGE (%)</label>
+                              <input type="number" min="0" max="100" placeholder="e.g. 15" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.discountPercentage || ''} onChange={e=>setEditForm({...editForm, discountPercentage:e.target.value})} />
+                            </div>
+                            <div className="form-group">
+                              <label style={{ marginBottom: '0.75rem', display: 'block', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>DISCOUNT EXPIRY DATE</label>
+                              <input type="date" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.discountValidUntil || ''} onChange={e=>setEditForm({...editForm, discountValidUntil:e.target.value})} />
+                            </div>
+                          </div>
+                          <div className="form-group">
+                            <label style={{ marginBottom: '0.75rem', display: 'block', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>PROMOTION TARGET SCOPE</label>
+                            <select style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: '#ec4899', fontWeight: '800', width: '100%' }} value={editForm.discountTargetTier || 'both'} onChange={e=>setEditForm({...editForm, discountTargetTier:e.target.value})}>
+                              <option value="both" style={{background:'#1a1a1a'}}>Apply to Both Peak & Base Rates</option>
+                              <option value="base" style={{background:'#1a1a1a'}}>Apply Only to Base Off-Peak Rate</option>
+                              <option value="peak" style={{background:'#1a1a1a'}}>Apply Only to Dynamic Peak Rate</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.25rem' }}>
+                          <label style={{ marginBottom: '1rem', display: 'block', color: '#f59e0b', fontWeight: '800', fontSize: '0.85rem' }}>⚡ DYNAMIC PEAK HOUR TIER CONFIGURATION</label>
+                          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                            <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '6px', fontWeight: '800' }}>PEAK RATE (PKR/hr)</label>
+                            <input type="number" placeholder="e.g. 6000" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.pricePeak || ''} onChange={e=>setEditForm({...editForm, pricePeak:e.target.value})} />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
+                            <div className="form-group">
+                              <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '8px', fontWeight: '800' }}>
+                                START TIME: <span style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>{formatAMPM(editForm.peakStartTime)}</span>
+                              </label>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', background: 'rgba(0,0,0,0.4)', padding: '10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '180px', overflowY: 'auto' }}>
+                                {hourOptions.slice(0, 24).map((h) => (
+                                  <button
+                                    key={h}
+                                    type="button"
+                                    onClick={() => setEditForm({...editForm, peakStartTime: h})}
+                                    style={{
+                                      padding: '8px 4px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: '800', border: '1px solid',
+                                      borderColor: editForm.peakStartTime === h ? '#f59e0b' : 'rgba(255,255,255,0.08)',
+                                      background: editForm.peakStartTime === h ? '#f59e0b' : 'rgba(255,255,255,0.03)',
+                                      color: editForm.peakStartTime === h ? 'black' : '#e5e7eb', cursor: 'pointer', transition: 'all 0.15s'
+                                    }}
+                                  >
+                                    {formatAMPM(h)}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="form-group">
+                              <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '8px', fontWeight: '800' }}>
+                                END TIME: <span style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>{formatAMPM(editForm.peakEndTime)}</span>
+                              </label>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', background: 'rgba(0,0,0,0.4)', padding: '10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '180px', overflowY: 'auto' }}>
+                                {hourOptions.slice(0, 24).map((h) => (
+                                  <button
+                                    key={h}
+                                    type="button"
+                                    onClick={() => setEditForm({...editForm, peakEndTime: h})}
+                                    style={{
+                                      padding: '8px 4px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: '800', border: '1px solid',
+                                      borderColor: editForm.peakEndTime === h ? '#f59e0b' : 'rgba(255,255,255,0.08)',
+                                      background: editForm.peakEndTime === h ? '#f59e0b' : 'rgba(255,255,255,0.03)',
+                                      color: editForm.peakEndTime === h ? 'black' : '#e5e7eb', cursor: 'pointer', transition: 'all 0.15s'
+                                    }}
+                                  >
+                                    {formatAMPM(h)}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -375,24 +515,51 @@ const AdminCourtView = ({ courtId }) => {
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
                         <div className="form-group">
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}><Clock size={16} /> OPERATIONAL START</label>
-                          <select style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.operationalStartTime || '00:00'} onChange={e=>setEditForm({...editForm, operationalStartTime:e.target.value})}>
-                            {hourOptions.slice(0, 24).map((h) => <option key={h} value={h} style={{background:'#1a1a1a'}}>{h}</option>)}
-                          </select>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>
+                            <Clock size={16} /> OPERATIONAL START: <span style={{ color: '#60a5fa', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>{formatAMPM(editForm.operationalStartTime || '00:00')}</span>
+                          </label>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', background: 'rgba(0,0,0,0.4)', padding: '10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '180px', overflowY: 'auto' }}>
+                            {hourOptions.slice(0, 24).map((h) => (
+                              <button
+                                key={h}
+                                type="button"
+                                onClick={() => setEditForm({...editForm, operationalStartTime: h})}
+                                style={{
+                                  padding: '8px 4px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: '800', border: '1px solid',
+                                  borderColor: editForm.operationalStartTime === h ? '#60a5fa' : 'rgba(255,255,255,0.08)',
+                                  background: editForm.operationalStartTime === h ? '#60a5fa' : 'rgba(255,255,255,0.03)',
+                                  color: editForm.operationalStartTime === h ? 'black' : '#e5e7eb', cursor: 'pointer', transition: 'all 0.15s'
+                                }}
+                              >
+                                {formatAMPM(h)}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                         <div className="form-group">
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}><Clock size={16} /> OPERATIONAL END</label>
-                          <select style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.operationalEndTime || '24:00'} onChange={e=>setEditForm({...editForm, operationalEndTime:e.target.value})}>
-                            {hourOptions.slice(1).map((h) => <option key={h} value={h} style={{background:'#1a1a1a'}}>{h}</option>)}
-                          </select>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>
+                            <Clock size={16} /> OPERATIONAL END: <span style={{ color: '#60a5fa', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>{formatAMPM(editForm.operationalEndTime || '24:00')}</span>
+                          </label>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', background: 'rgba(0,0,0,0.4)', padding: '10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '180px', overflowY: 'auto' }}>
+                            {hourOptions.slice(1).map((h) => (
+                              <button
+                                key={h}
+                                type="button"
+                                onClick={() => setEditForm({...editForm, operationalEndTime: h})}
+                                style={{
+                                  padding: '8px 4px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: '800', border: '1px solid',
+                                  borderColor: editForm.operationalEndTime === h ? '#60a5fa' : 'rgba(255,255,255,0.08)',
+                                  background: editForm.operationalEndTime === h ? '#60a5fa' : 'rgba(255,255,255,0.03)',
+                                  color: editForm.operationalEndTime === h ? 'black' : '#e5e7eb', cursor: 'pointer', transition: 'all 0.15s'
+                                }}
+                              >
+                                {formatAMPM(h)}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-
-                      <div className="form-group" style={{ marginBottom: '2.5rem' }}>
-                        <label style={{ marginBottom: '0.75rem', display: 'block', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>FACILITY DESCRIPTION</label>
-                        <textarea rows="4" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%', resize: 'none' }} value={editForm.description || ''} onChange={e=>setEditForm({...editForm, description:e.target.value})} />
                       </div>
 
                       <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '2rem', borderRadius: '24px', border: '1px dashed rgba(59, 130, 246, 0.3)', textAlign: 'center', marginBottom: '3rem' }}>
@@ -470,6 +637,24 @@ const AdminCourtView = ({ courtId }) => {
                     </form>
                 </div>
             </div>
+        )}
+
+        {previewImage && (
+          <div className="modal-overlay" onClick={() => setPreviewImage(null)}>
+            <div className="lightbox-modal-content" onClick={e => e.stopPropagation()}>
+              <button type="button" className="close-modal" onClick={() => setPreviewImage(null)}>
+                <X size={24} />
+              </button>
+              <img src={previewImage} alt="Full size preview" className="lightbox-img" />
+              <button 
+                type="button" 
+                onClick={() => handleDownloadScreenshot(previewImage, 'admin_preview')}
+                style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 auto' }}
+              >
+                <Download size={18} /> Download Screenshot
+              </button>
+            </div>
+          </div>
         )}
     </div>
   );

@@ -5,6 +5,7 @@ const Court = require('../models/Court');
 const { protect, admin, manager } = require('../middleware/authMiddleware');
 const rateLimit = require('express-rate-limit');
 const { sendEmail } = require('../utils/emailService');
+const { upload } = require('../config/cloudinary');
 
 const bookingLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -137,6 +138,24 @@ router.post('/', protect, bookingLimiter, async (req, res, next) => {
       res.status(400); throw new Error('No time slots provided.');
     }
 
+    // Validate booking date limit (Max 4 weeks / 28 days in advance)
+    const bookingDate = new Date(date);
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 28);
+    bookingDate.setHours(0,0,0,0);
+    const todayCompare = new Date();
+    todayCompare.setHours(0,0,0,0);
+    maxDate.setHours(0,0,0,0);
+
+    if (bookingDate > maxDate) {
+      res.status(400);
+      throw new Error('Bookings can only be scheduled up to 4 weeks in advance.');
+    }
+    if (bookingDate < todayCompare) {
+      res.status(400);
+      throw new Error('Cannot book dates in the past.');
+    }
+
     const pendingCount = await Booking.countDocuments({ user: req.user._id, status: { $in: ['Awaiting Payment', 'Pending'] } });
     if (pendingCount + timeBlocks.length > 3) {
         res.status(400); throw new Error('You can only have up to 3 pending booking slots at a time. Please wait for approval or cancel a pending request.');
@@ -150,7 +169,51 @@ router.post('/', protect, bookingLimiter, async (req, res, next) => {
     const openHour = parseHour(court.operationalStartTime || '00:00');
     const closeHour = parseHour(court.operationalEndTime || '24:00');
     const createdBookings = [];
-    const pricePerBlock = totalPrice / timeBlocks.length;
+
+    // Calculate total hours selected across all blocks to validate minSlots
+    let totalSelectedHours = 0;
+    for (let block of timeBlocks) {
+      const s = parseHour(block.startTime);
+      const e = parseHour(block.endTime);
+      if (s !== null && e !== null && e > s) {
+        totalSelectedHours += (e - s);
+      }
+    }
+    if (totalSelectedHours < (court.minSlots || 1)) {
+      res.status(400);
+      throw new Error(`This venue requires a minimum booking of ${court.minSlots} consecutive hours.`);
+    }
+
+    // Helper to calculate exact dynamic price for a continuous block
+    const getBlockPrice = (startStr, endStr, courtObj) => {
+      const s = parseHour(startStr);
+      const e = parseHour(endStr);
+      let total = 0;
+      const isDiscountActive = courtObj.discount?.percentage > 0 && 
+        (!courtObj.discount.validUntil || new Date() <= new Date(courtObj.discount.validUntil));
+
+      for (let h = s; h < e; h++) {
+        let base = courtObj.pricePerHour;
+        let isPeakHour = false;
+        if (courtObj.pricePeak && courtObj.peakStartTime && courtObj.peakEndTime) {
+          const pHStart = parseHour(courtObj.peakStartTime);
+          const pHEnd = parseHour(courtObj.peakEndTime);
+          if (pHStart !== null && pHEnd !== null && h >= pHStart && h < pHEnd) {
+            base = courtObj.pricePeak;
+            isPeakHour = true;
+          }
+        }
+        if (isDiscountActive) {
+          const targetTier = courtObj.discount?.targetTier || 'both';
+          const appliesToThisSlot = targetTier === 'both' || (isPeakHour && targetTier === 'peak') || (!isPeakHour && targetTier === 'base');
+          if (appliesToThisSlot) {
+            base = Math.round(base * (1 - courtObj.discount.percentage / 100));
+          }
+        }
+        total += base;
+      }
+      return total;
+    };
 
     for (let block of timeBlocks) {
       const { startTime, endTime } = block;
@@ -180,6 +243,8 @@ router.post('/', protect, bookingLimiter, async (req, res, next) => {
         res.status(400); throw new Error(`Slot ${startTime}-${endTime} is not available.`);
       }
 
+      const calculatedBlockPrice = getBlockPrice(startTime, endTime, court);
+
       const booking = new Booking({
         user: req.user._id,
         court: courtId,
@@ -189,7 +254,7 @@ router.post('/', protect, bookingLimiter, async (req, res, next) => {
         endTime,
         status: 'Awaiting Payment',
         type: 'Online',
-        totalPrice: pricePerBlock || 0
+        totalPrice: calculatedBlockPrice
       });
 
       await booking.save();
@@ -202,16 +267,11 @@ router.post('/', protect, bookingLimiter, async (req, res, next) => {
   }
 });
 
-router.put('/:id/submit-payment-proof', protect, async (req, res, next) => {
+router.put('/:id/submit-payment-proof', protect, upload.single('paymentScreenshot'), async (req, res, next) => {
   try {
-    const { senderName, transactionIdShort } = req.body;
-    if (!senderName || !senderName.trim()) {
+    if (!req.file) {
       res.status(400);
-      throw new Error('Sender account name is required.');
-    }
-    if (!/^\d{4}$/.test(transactionIdShort || '')) {
-      res.status(400);
-      throw new Error('Last 4 digits of TID must be exactly 4 numbers.');
+      throw new Error('Payment screenshot file is required.');
     }
 
     const booking = await Booking.findById(req.params.id).populate({ path: 'court', populate: { path: 'manager' } }).populate('user');
@@ -228,8 +288,7 @@ router.put('/:id/submit-payment-proof', protect, async (req, res, next) => {
       throw new Error('Booking is not awaiting payment.');
     }
 
-    booking.senderName = senderName.trim();
-    booking.transactionIdShort = transactionIdShort;
+    booking.paymentScreenshot = req.file.path;
     booking.advancePaid = booking.court?.advanceRequired || 0;
     booking.status = 'Pending';
     const updatedBooking = await booking.save();
@@ -273,7 +332,8 @@ router.get('/mybookings', protect, async (req, res, next) => {
   try {
     const bookings = await Booking.find({ user: req.user._id })
         .populate('court', 'name facilities location')
-        .sort({ date: -1 }); // Newest first
+        .sort({ date: -1 })
+        .lean(); // Returns raw JS objects avoiding Mongoose document wrapping overhead
     res.json(bookings);
   } catch (error) {
     next(error);
