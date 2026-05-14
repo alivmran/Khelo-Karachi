@@ -7,12 +7,23 @@ const reviewSchema = mongoose.Schema({
   comment: { type: String, required: true }
 }, { timestamps: true });
 
+const subCourtDetailSchema = mongoose.Schema({
+  name: { type: String, required: true },
+  sport: { type: String, enum: ['Padel', 'Futsal', 'Cricket'], required: true },
+  pricePerHour: { type: Number, required: true },
+  hasPeakPricing: { type: Boolean, default: false },
+  peakStartTime: { type: String },
+  peakEndTime: { type: String },
+  pricePeak: { type: Number }
+});
+
 const courtSchema = mongoose.Schema({
   name: { type: String, required: true }, 
   facilities: [{
     type: String,
     enum: ['Padel', 'Futsal', 'Cricket']
   }],
+  courtsDetail: [subCourtDetailSchema],
   location: { type: String, default: 'Karachi, Pakistan' }, // New
   notificationEmail: { type: String }, // For manager notifications
   googleMapLink: { type: String }, // New
@@ -44,5 +55,10 @@ const courtSchema = mongoose.Schema({
 courtSchema.path('facilities').validate(function (value) {
   return Array.isArray(value) && value.length > 0;
 }, 'At least one facility is required.');
+
+// Performance optimizations: Database Indexing for high-concurrency lookups
+courtSchema.index({ facilities: 1 });
+courtSchema.index({ name: 1 });
+courtSchema.index({ manager: 1 });
 
 module.exports = mongoose.model('Court', courtSchema);

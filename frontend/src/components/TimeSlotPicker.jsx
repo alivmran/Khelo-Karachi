@@ -21,7 +21,8 @@ const TimeSlotPicker = ({
   startHour = 0,
   endHour = 24,
   selectedDate = '',
-  court = null
+  court = null,
+  selectedFacility = ''
 }) => {
   const generateSlots = () => {
     const slots = [];
@@ -73,6 +74,10 @@ const TimeSlotPicker = ({
           user-select: none;
           font-weight: 600;
           box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          min-height: 58px;
         }
         .timeslot-card:hover {
           border-color: #60a5fa;
@@ -91,24 +96,36 @@ const TimeSlotPicker = ({
           const isSelected = selectedSlots.includes(slot);
           const [start, end] = slot.split('-');
           const startH = parseHourHelper(start);
-          let isPeak = false;
-          let basePrice = court?.pricePerHour || 0;
 
-          if (court && court.pricePeak && court.peakStartTime && court.peakEndTime) {
-            const pHStart = parseHourHelper(court.peakStartTime);
-            const pHEnd = parseHourHelper(court.peakEndTime);
+          // Resolve specific sub-court properties vs top-level defaults
+          const subCourtObj = court?.courtsDetail?.find(c => c.name === selectedFacility);
+          const baseRate = subCourtObj ? subCourtObj.pricePerHour : (court?.pricePerHour || 0);
+          const hasPeakConfig = subCourtObj 
+            ? (subCourtObj.hasPeakPricing && subCourtObj.pricePeak && subCourtObj.peakStartTime && subCourtObj.peakEndTime)
+            : (court?.pricePeak && court?.peakStartTime && court?.peakEndTime);
+
+          const customPeakStart = subCourtObj?.hasPeakPricing ? subCourtObj.peakStartTime : court?.peakStartTime;
+          const customPeakEnd = subCourtObj?.hasPeakPricing ? subCourtObj.peakEndTime : court?.peakEndTime;
+          const customPricePeak = subCourtObj?.hasPeakPricing ? subCourtObj.pricePeak : court?.pricePeak;
+
+          let isPeak = false;
+          let currentPrice = baseRate;
+
+          if (hasPeakConfig) {
+            const pHStart = parseHourHelper(customPeakStart);
+            const pHEnd = parseHourHelper(customPeakEnd);
             if (pHStart !== null && pHEnd !== null && startH >= pHStart && startH < pHEnd) {
               isPeak = true;
-              basePrice = court.pricePeak;
+              currentPrice = customPricePeak;
             }
           }
 
-          let finalPrice = basePrice;
+          let finalPrice = currentPrice;
           const isDiscountActive = court?.discount?.percentage > 0 && 
             (!court.discount.validUntil || new Date() <= new Date(court.discount.validUntil));
 
           if (isDiscountActive) {
-            finalPrice = Math.round(basePrice * (1 - court.discount.percentage / 100));
+            finalPrice = Math.round(currentPrice * (1 - court.discount.percentage / 100));
           }
 
           return (
@@ -117,28 +134,45 @@ const TimeSlotPicker = ({
               className={`timeslot-card ${isSelected ? 'selected' : ''} ${isPeak ? 'peak-slot' : ''}`}
               onClick={() => toggleSlot(slot)}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>
-                <span style={{ fontSize: '0.65rem', fontWeight: '800', color: isPeak ? '#f59e0b' : '#60a5fa', textTransform: 'uppercase' }}>
-                  {isPeak ? '⚡ Peak' : '🌿 Off-Peak'}
-                </span>
-                {court && basePrice > 0 && (
-                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: isSelected ? 'white' : '#10b981' }}>
-                    {isDiscountActive ? (
-                      <>
-                        <span style={{ textDecoration: 'line-through', color: isSelected ? 'rgba(255,255,255,0.6)' : '#6b7280', fontSize: '0.65rem', marginRight: '4px' }}>
-                          {basePrice}
-                        </span>
-                        {finalPrice}
-                      </>
-                    ) : (
-                      finalPrice
+              {hasPeakConfig ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px', minHeight: '18px' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: '800', color: isPeak ? '#f59e0b' : '#60a5fa', textTransform: 'uppercase' }}>
+                      {isPeak ? '★ PEAK' : 'BASE'}
+                    </span>
+                    {court && baseRate > 0 && (
+                      <span style={{ fontSize: '0.75rem', fontWeight: '800', color: isSelected ? 'white' : '#10b981' }}>
+                        {isDiscountActive ? (
+                          <>
+                            <span style={{ textDecoration: 'line-through', color: isSelected ? 'rgba(255,255,255,0.6)' : '#6b7280', fontSize: '0.65rem', marginRight: '4px' }}>
+                              {currentPrice}
+                            </span>
+                            {finalPrice}
+                          </>
+                        ) : (
+                          finalPrice
+                        )}
+                      </span>
                     )}
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: '0.8rem', fontWeight: '700', color: isSelected ? 'white' : '#e2e8f0' }}>
-                {to12Hour(start)} - {to12Hour(end)}
-              </div>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: '700', color: isSelected ? 'white' : '#e2e8f0' }}>
+                    {to12Hour(start)} - {to12Hour(end)}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {court && baseRate > 0 && (
+                    <div style={{ marginBottom: '3px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: '800', color: isSelected ? 'white' : '#10b981', background: isSelected ? 'rgba(0,0,0,0.15)' : 'rgba(16, 185, 129, 0.08)', padding: '2px 8px', borderRadius: '6px' }}>
+                        PKR {isDiscountActive ? finalPrice : currentPrice}
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ fontSize: '0.82rem', fontWeight: '700', color: isSelected ? 'white' : '#e2e8f0', textAlign: 'center' }}>
+                    {to12Hour(start)} - {to12Hour(end)}
+                  </div>
+                </>
+              )}
             </div>
           );
         })}

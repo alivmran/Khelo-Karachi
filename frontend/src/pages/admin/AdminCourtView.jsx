@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../../api/axios';
 import { toast } from 'react-toastify';
@@ -23,7 +23,8 @@ import {
   AlertCircle,
   Eye,
   Download,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 
 const parseHour = (timeString, fallback) => {
@@ -42,6 +43,9 @@ const AdminCourtView = ({ courtId }) => {
   const [unavailableSlots, setUnavailableSlots] = useState([]);
   const [images, setImages] = useState([]);
   const [previewImage, setPreviewImage] = useState(null);
+  const [subCourtInput, setSubCourtInput] = useState({
+    name: '', sport: 'Futsal', pricePerHour: '', hasPeakPricing: false, peakStartTime: '18:00', peakEndTime: '23:00', pricePeak: ''
+  });
   const hourOptions = Array.from({ length: 25 }, (_, h) => `${h.toString().padStart(2, '0')}:00`);
   const formatAMPM = (timeStr) => {
     if (!timeStr) return 'None';
@@ -80,6 +84,7 @@ const AdminCourtView = ({ courtId }) => {
             location: data.court.location,
             facilities: data.court.facilities || [],
             amenities: data.court.amenities || [],
+            courtsDetail: data.court.courtsDetail || [],
             googleMapLink: data.court.googleMapLink || '',
             paymentBank: data.court.paymentBank || '',
             paymentAccountTitle: data.court.paymentAccountTitle || '',
@@ -126,6 +131,8 @@ const AdminCourtView = ({ courtId }) => {
         Object.keys(editForm).forEach(key => {
           if (key === 'facilities' || key === 'amenities') {
             (editForm[key] || []).forEach(item => formData.append(key, item));
+          } else if (key === 'courtsDetail') {
+            formData.append('courtsDetail', JSON.stringify(editForm.courtsDetail || []));
           } else if (editForm[key] !== undefined && editForm[key] !== null) {
             formData.append(key, editForm[key]);
           }
@@ -138,6 +145,29 @@ const AdminCourtView = ({ courtId }) => {
         setImages([]);
       } 
       catch (error) { toast.error('Update failed'); }
+  };
+
+  const handleAddSubCourt = () => {
+    if (!subCourtInput.name || !subCourtInput.pricePerHour) {
+      toast.error('Please enter sub-court name and base price');
+      return;
+    }
+    setEditForm(prev => ({
+      ...prev,
+      courtsDetail: [...(prev.courtsDetail || []), {
+        ...subCourtInput,
+        pricePerHour: Number(subCourtInput.pricePerHour),
+        pricePeak: subCourtInput.pricePeak ? Number(subCourtInput.pricePeak) : undefined
+      }]
+    }));
+    setSubCourtInput({ name: '', sport: 'Futsal', pricePerHour: '', hasPeakPricing: false, peakStartTime: '18:00', peakEndTime: '23:00', pricePeak: '' });
+  };
+
+  const handleRemoveSubCourt = (index) => {
+    setEditForm(prev => ({
+      ...prev,
+      courtsDetail: (prev.courtsDetail || []).filter((_, i) => i !== index)
+    }));
   };
 
   const toggleEditFacility = (facility) => {
@@ -411,9 +441,85 @@ const AdminCourtView = ({ courtId }) => {
                         </div>
                       </div>
 
+                      {/* Individual Specific Sub-Courts Builder */}
+                      <div style={{ background: 'rgba(59, 130, 246, 0.04)', border: '1px solid rgba(59, 130, 246, 0.15)', borderRadius: '24px', padding: '1.75rem', marginBottom: '2.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                          <div>
+                            <h3 style={{ fontSize: '0.95rem', color: '#60a5fa', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>★ Specific Physical Courts Hub</h3>
+                            <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '4px 0 0 0' }}>Configure multiple independent physical fields inside this venue (e.g. Futsal Court 1, VIP Court) with distinct pricing rules.</p>
+                          </div>
+                          <span style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', fontSize: '0.7rem', fontWeight: '900', padding: '4px 10px', borderRadius: '8px' }}>Sub-Courts Array</span>
+                        </div>
+
+                        {/* Added Sub-Courts Table */}
+                        {(editForm.courtsDetail || []).length > 0 && (
+                          <div style={{ display: 'grid', gap: '8px', marginBottom: '1.5rem' }}>
+                            {(editForm.courtsDetail || []).map((c, i) => (
+                              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.4)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{ color: 'white', fontWeight: '800', fontSize: '0.9rem' }}>{c.name}</span>
+                                    <span style={{ background: 'rgba(255,255,255,0.05)', color: '#9ca3af', fontSize: '0.65rem', fontWeight: '800', padding: '2px 6px', borderRadius: '4px' }}>{c.sport}</span>
+                                  </div>
+                                  <div style={{ fontSize: '0.75rem', color: '#34d399', fontWeight: '700', marginTop: '4px' }}>
+                                    Base: PKR {c.pricePerHour}/hr {c.hasPeakPricing && c.pricePeak ? `| Peak: PKR ${c.pricePeak}/hr (${c.peakStartTime}-${c.peakEndTime})` : '| Flat Pricing 24/7'}
+                                  </div>
+                                </div>
+                                <button type="button" onClick={() => handleRemoveSubCourt(i)} style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Sub-Court Input Row */}
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', display: 'grid', gap: '1rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '10px' }}>
+                            <div>
+                              <label style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: '800', display: 'block', marginBottom: '4px' }}>SUB-COURT UNIQUE NAME</label>
+                              <input style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px', color: 'white', width: '100%', fontSize: '0.8rem' }} placeholder="e.g. Futsal Arena 1" value={subCourtInput.name} onChange={e => setSubCourtInput({ ...subCourtInput, name: e.target.value })} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: '800', display: 'block', marginBottom: '4px' }}>SPORT TYPE</label>
+                              <select style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px', color: '#60a5fa', fontWeight: '800', width: '100%', fontSize: '0.8rem' }} value={subCourtInput.sport} onChange={e => setSubCourtInput({ ...subCourtInput, sport: e.target.value })}>
+                                <option value="Futsal" style={{background:'#1a1a1a'}}>Futsal</option>
+                                <option value="Padel" style={{background:'#1a1a1a'}}>Padel</option>
+                                <option value="Cricket" style={{background:'#1a1a1a'}}>Cricket</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: '800', display: 'block', marginBottom: '4px' }}>FLAT BASE RATE</label>
+                              <input type="number" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px', color: 'white', width: '100%', fontSize: '0.8rem' }} placeholder="PKR/hr" value={subCourtInput.pricePerHour} onChange={e => setSubCourtInput({ ...subCourtInput, pricePerHour: e.target.value })} />
+                            </div>
+                          </div>
+
+                          {/* Pricing Toggles */}
+                          <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: subCourtInput.hasPeakPricing ? '#f59e0b' : '#9ca3af', fontSize: '0.75rem', fontWeight: '800' }}>
+                              <input type="checkbox" checked={subCourtInput.hasPeakPricing} onChange={e => setSubCourtInput({ ...subCourtInput, hasPeakPricing: e.target.checked })} style={{ accentColor: '#f59e0b' }} />
+                              Enable Custom Peak Hour Surcharge
+                            </label>
+
+                            {subCourtInput.hasPeakPricing && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '6px 10px', color: 'white', width: '70px', fontSize: '0.75rem', textAlign: 'center' }} placeholder="Start" value={subCourtInput.peakStartTime} onChange={e => setSubCourtInput({ ...subCourtInput, peakStartTime: e.target.value })} />
+                                <span style={{ color: '#64748b' }}>to</span>
+                                <input style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '6px 10px', color: 'white', width: '70px', fontSize: '0.75rem', textAlign: 'center' }} placeholder="End" value={subCourtInput.peakEndTime} onChange={e => setSubCourtInput({ ...subCourtInput, peakEndTime: e.target.value })} />
+                                <input type="number" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid #f59e0b', borderRadius: '8px', padding: '6px 10px', color: '#f59e0b', width: '100px', fontSize: '0.75rem', fontWeight: '800' }} placeholder="Peak Rate" value={subCourtInput.pricePeak} onChange={e => setSubCourtInput({ ...subCourtInput, pricePeak: e.target.value })} />
+                              </div>
+                            )}
+
+                            <button type="button" onClick={handleAddSubCourt} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: '800', fontSize: '0.75rem', cursor: 'pointer' }}>
+                              + Add Sub-Court
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
                       <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '24px', marginBottom: '2.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <h4 style={{ color: '#60a5fa', marginBottom: '1.25rem', marginTop: 0, fontSize: '0.95rem', fontWeight: '800' }}>
-                          âš¡ PRICING & OPERATIONAL CONSTRAINTS
+                          ★ PRICING & OPERATIONAL CONSTRAINTS
                         </h4>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
                           <div className="form-group">
@@ -427,7 +533,7 @@ const AdminCourtView = ({ courtId }) => {
                         </div>
 
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.25rem', marginBottom: '1.5rem' }}>
-                          <label style={{ marginBottom: '1rem', display: 'block', color: '#ec4899', fontWeight: '800', fontSize: '0.85rem' }}>ðŸ·ï¸ PROMOTIONAL CAMPAIGN CONTROL</label>
+                          <label style={{ marginBottom: '1rem', display: 'block', color: '#ec4899', fontWeight: '800', fontSize: '0.85rem' }}>★ PROMOTIONAL CAMPAIGN CONTROL</label>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
                             <div className="form-group">
                               <label style={{ marginBottom: '0.75rem', display: 'block', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>DISCOUNT PERCENTAGE (%)</label>
@@ -449,7 +555,7 @@ const AdminCourtView = ({ courtId }) => {
                         </div>
 
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.25rem' }}>
-                          <label style={{ marginBottom: '1rem', display: 'block', color: '#f59e0b', fontWeight: '800', fontSize: '0.85rem' }}>âš¡ DYNAMIC PEAK HOUR TIER CONFIGURATION</label>
+                          <label style={{ marginBottom: '1rem', display: 'block', color: '#f59e0b', fontWeight: '800', fontSize: '0.85rem' }}>★ DYNAMIC PEAK HOUR TIER CONFIGURATION</label>
                           <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                             <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '6px', fontWeight: '800' }}>PEAK RATE (PKR/hr)</label>
                             <input type="number" placeholder="e.g. 6000" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.pricePeak || ''} onChange={e=>setEditForm({...editForm, pricePeak:e.target.value})} />
@@ -661,4 +767,3 @@ const AdminCourtView = ({ courtId }) => {
 };
 
 export default AdminCourtView;
-AdminCourtView;

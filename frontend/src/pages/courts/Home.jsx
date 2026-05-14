@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useContext } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../../api/axios';
 import AuthContext from '../../context/AuthContext';
@@ -299,7 +299,7 @@ const Home = () => {
                       <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>Live Rate</span>
                       {isLivePeak && (
                         <span style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', fontSize: '0.65rem', fontWeight: '900', padding: '2px 6px', borderRadius: '4px' }}>
-                          âš¡ PEAK HOUR
+                          ★ PEAK HOUR
                         </span>
                       )}
                     </div>

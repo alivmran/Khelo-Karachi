@@ -195,6 +195,19 @@ router.put('/court-details', protect, manager, upload.array('images', 5), async 
       court.facilities = [];
     }
 
+    if (req.body.courtsDetail) {
+      try {
+        const parsed = typeof req.body.courtsDetail === 'string' ? JSON.parse(req.body.courtsDetail) : req.body.courtsDetail;
+        court.courtsDetail = parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const derivedSports = parsed.map(c => c.sport).filter(Boolean);
+          court.facilities = [...new Set([...court.facilities, ...derivedSports])];
+        }
+      } catch (e) {
+        console.error('Failed to parse courtsDetail in manager route:', e);
+      }
+    }
+
     if (req.body.amenities) {
       court.amenities = Array.isArray(req.body.amenities) ? req.body.amenities : [req.body.amenities];
     } else if (req.body.amenities === '') {

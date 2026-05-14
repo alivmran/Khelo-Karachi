@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import API from '../../api/axios';
 import { toast } from 'react-toastify';
 import TimeSlotPicker from '../../components/TimeSlotPicker';
@@ -28,7 +28,8 @@ import {
   Save,
   Image as ImageIcon,
   MapPin,
-  Edit
+  Edit,
+  Trash2
 } from 'lucide-react';
 
 const parseHour = (timeString, fallback) => {
@@ -71,6 +72,7 @@ const ManagerDashboard = () => {
     location: '',
     facilities: [],
     amenities: [],
+    courtsDetail: [],
     paymentBank: '',
     paymentAccountTitle: '',
     paymentAccountNumber: '',
@@ -81,6 +83,9 @@ const ManagerDashboard = () => {
     pricePeak: ''
   });
   const [images, setImages] = useState([]);
+  const [subCourtInput, setSubCourtInput] = useState({
+    name: '', sport: 'Futsal', pricePerHour: '', hasPeakPricing: false, peakStartTime: '18:00', peakEndTime: '23:00', pricePeak: ''
+  });
 
   const toggleEditFacility = (f) => {
     setEditForm(prev => {
@@ -119,7 +124,11 @@ const ManagerDashboard = () => {
       try {
         const { data } = await API.get('/manager/dashboard');
         setData(data);
-        setBlockFacility(data?.court?.facilities?.[0] || '');
+        if (data?.court?.courtsDetail?.length > 0) {
+          setBlockFacility(data.court.courtsDetail[0].name);
+        } else {
+          setBlockFacility(data?.court?.facilities?.[0] || '');
+        }
         if (data?.court) {
           setPricingConfig({
             discountPercentage: data.court.discount?.percentage || '',
@@ -134,6 +143,7 @@ const ManagerDashboard = () => {
             location: data.court.location || '',
             facilities: data.court.facilities || [],
             amenities: data.court.amenities || [],
+            courtsDetail: data.court.courtsDetail || [],
             paymentBank: data.court.paymentBank || '',
             paymentAccountTitle: data.court.paymentAccountTitle || '',
             paymentAccountNumber: data.court.paymentAccountNumber || '',
@@ -158,7 +168,13 @@ const ManagerDashboard = () => {
       const formData = new FormData();
       Object.keys(editForm).forEach(key => {
         if (key === 'facilities' || key === 'amenities') {
-          editForm[key].forEach(val => formData.append(key, val));
+          if (editForm[key] && editForm[key].length > 0) {
+            editForm[key].forEach(val => formData.append(key, val));
+          } else {
+            formData.append(key, '');
+          }
+        } else if (key === 'courtsDetail') {
+          formData.append('courtsDetail', JSON.stringify(editForm.courtsDetail || []));
         } else if (editForm[key] !== undefined && editForm[key] !== null) {
           formData.append(key, editForm[key]);
         }
@@ -181,6 +197,29 @@ const ManagerDashboard = () => {
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update court details');
     }
+  };
+
+  const handleAddSubCourt = () => {
+    if (!subCourtInput.name || !subCourtInput.pricePerHour) {
+      toast.error('Please enter sub-court name and base price');
+      return;
+    }
+    setEditForm(prev => ({
+      ...prev,
+      courtsDetail: [...(prev.courtsDetail || []), {
+        ...subCourtInput,
+        pricePerHour: Number(subCourtInput.pricePerHour),
+        pricePeak: subCourtInput.pricePeak ? Number(subCourtInput.pricePeak) : undefined
+      }]
+    }));
+    setSubCourtInput({ name: '', sport: 'Futsal', pricePerHour: '', hasPeakPricing: false, peakStartTime: '18:00', peakEndTime: '23:00', pricePeak: '' });
+  };
+
+  const handleRemoveSubCourt = (index) => {
+    setEditForm(prev => ({
+      ...prev,
+      courtsDetail: (prev.courtsDetail || []).filter((_, i) => i !== index)
+    }));
   };
 
   const handleUpdatePricing = async (e) => {
@@ -465,23 +504,29 @@ const ManagerDashboard = () => {
                   <p style={{ color: '#6b7280' }}>No recent activity to show.</p>
                 </div>
               ) : (
-                data.recentActivity.map((b) => (
-                  <div key={b._id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '1.25rem', transition: 'transform 0.2s' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa' }}>
-                          <ChevronRight size={20} />
+                data.recentActivity.map((b) => {
+                  const subObj = data.court?.courtsDetail?.find(c => c.name === b.facility);
+                  const sportLabel = subObj ? subObj.sport : b.facility;
+                  return (
+                    <div key={b._id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '1.25rem', transition: 'transform 0.2s' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa' }}>
+                            <ChevronRight size={20} />
+                          </div>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>{b.user ? b.user.name : 'Manual Block'}</h4>
+                            <p style={{ margin: '4px 0', color: '#60a5fa', fontSize: '0.85rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', color: '#93c5fd', textTransform: 'uppercase' }}>{sportLabel}</span>
+                              <span style={{ color: 'white' }}>{b.facility}</span>
+                            </p>
+                            <p style={{ margin: 0, color: '#9ca3af', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Calendar size={14} /> {b.date} <Clock size={14} style={{ marginLeft: '4px' }} /> {b.startTime} - {b.endTime}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>{b.user ? b.user.name : 'Manual Block'}</h4>
-                          <p style={{ margin: '4px 0', color: '#93c5fd', fontSize: '0.85rem', fontWeight: '600' }}>{b.facility}</p>
-                          <p style={{ margin: 0, color: '#9ca3af', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Calendar size={14} /> {b.date} <Clock size={14} style={{ marginLeft: '4px' }} /> {b.startTime} - {b.endTime}
-                          </p>
-                        </div>
+                        <span className={`status ${b.status.toLowerCase().replace(/\s+/g, '-')}`} style={{ borderRadius: '8px', padding: '6px 12px', fontSize: '0.75rem', fontWeight: '800' }}>{b.status}</span>
                       </div>
-                      <span className={`status ${b.status.toLowerCase().replace(/\s+/g, '-')}`} style={{ borderRadius: '8px', padding: '6px 12px', fontSize: '0.75rem', fontWeight: '800' }}>{b.status}</span>
-                    </div>
 
                     {b.status === 'Pending' && b.type === 'Online' && (
                       <div style={{ marginTop: '1.25rem', padding: '1.25rem', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '14px', background: 'rgba(16,185,129,0.03)' }}>
@@ -625,7 +670,8 @@ const ManagerDashboard = () => {
                       </div>
                     )}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -655,9 +701,15 @@ const ManagerDashboard = () => {
                         width: '100%'
                       }}
                     >
-                      {(data.court?.facilities || []).map((f) => (
-                        <option key={f} value={f} style={{ background: '#1a1a1a', color: 'white' }}>{f}</option>
-                      ))}
+                      {data.court?.courtsDetail?.length > 0 ? (
+                        data.court.courtsDetail.map((c) => (
+                          <option key={c.name} value={c.name} style={{ background: '#1a1a1a', color: 'white' }}>{c.name} ({c.sport})</option>
+                        ))
+                      ) : (
+                        (data.court?.facilities || []).map((f) => (
+                          <option key={f} value={f} style={{ background: '#1a1a1a', color: 'white' }}>{f}</option>
+                        ))
+                      )}
                     </select>
                   </div>
                   <div className="form-group">
@@ -814,7 +866,7 @@ const ManagerDashboard = () => {
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                         <XAxis dataKey="date" stroke="#9ca3af" fontSize={11} tickLine={false} label={{ value: 'Date Timeline', position: 'insideBottom', offset: -10, fill: '#6b7280', fontSize: 10 }} />
-                        <YAxis stroke="#9ca3af" fontSize={11} tickLine={false} tickFormatter={val => `â‚¨${val.toLocaleString()}`} label={{ value: 'Total Revenue (PKR)', angle: -90, position: 'insideLeft', offset: -10, fill: '#6b7280', fontSize: 10, style: { textAnchor: 'middle' } }} />
+                        <YAxis stroke="#9ca3af" fontSize={11} tickLine={false} tickFormatter={val => `PKR ${val.toLocaleString()}`} label={{ value: 'Total Revenue (PKR)', angle: -90, position: 'insideLeft', offset: -10, fill: '#6b7280', fontSize: 10, style: { textAnchor: 'middle' } }} />
                         <Tooltip 
                           contentStyle={{ background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px' }}
                           itemStyle={{ color: '#f3f4f6', fontWeight: '600' }}
@@ -957,9 +1009,85 @@ const ManagerDashboard = () => {
                   </div>
                 </div>
 
+                {/* Individual Specific Sub-Courts Builder */}
+                <div style={{ background: 'rgba(59, 130, 246, 0.04)', border: '1px solid rgba(59, 130, 246, 0.15)', borderRadius: '24px', padding: '1.75rem', marginBottom: '2.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                    <div>
+                      <h3 style={{ fontSize: '0.95rem', color: '#60a5fa', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>★ Specific Physical Courts Hub</h3>
+                      <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '4px 0 0 0' }}>Configure multiple independent physical fields inside this venue (e.g. Futsal Court 1, VIP Court) with distinct pricing rules.</p>
+                    </div>
+                    <span style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', fontSize: '0.7rem', fontWeight: '900', padding: '4px 10px', borderRadius: '8px' }}>Sub-Courts Array</span>
+                  </div>
+
+                  {/* Added Sub-Courts Table */}
+                  {(editForm.courtsDetail || []).length > 0 && (
+                    <div style={{ display: 'grid', gap: '8px', marginBottom: '1.5rem' }}>
+                      {(editForm.courtsDetail || []).map((c, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.4)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ color: 'white', fontWeight: '800', fontSize: '0.9rem' }}>{c.name}</span>
+                              <span style={{ background: 'rgba(255,255,255,0.05)', color: '#9ca3af', fontSize: '0.65rem', fontWeight: '800', padding: '2px 6px', borderRadius: '4px' }}>{c.sport}</span>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#34d399', fontWeight: '700', marginTop: '4px' }}>
+                              Base: PKR {c.pricePerHour}/hr {c.hasPeakPricing && c.pricePeak ? `| Peak: PKR ${c.pricePeak}/hr (${c.peakStartTime}-${c.peakEndTime})` : '| Flat Pricing 24/7'}
+                            </div>
+                          </div>
+                          <button type="button" onClick={() => handleRemoveSubCourt(i)} style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Sub-Court Input Row */}
+                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', display: 'grid', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: '800', display: 'block', marginBottom: '4px' }}>SUB-COURT UNIQUE NAME</label>
+                        <input style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px', color: 'white', width: '100%', fontSize: '0.8rem' }} placeholder="e.g. Futsal Arena 1" value={subCourtInput.name} onChange={e => setSubCourtInput({ ...subCourtInput, name: e.target.value })} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: '800', display: 'block', marginBottom: '4px' }}>SPORT TYPE</label>
+                        <select style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px', color: '#60a5fa', fontWeight: '800', width: '100%', fontSize: '0.8rem' }} value={subCourtInput.sport} onChange={e => setSubCourtInput({ ...subCourtInput, sport: e.target.value })}>
+                          <option value="Futsal" style={{background:'#1a1a1a'}}>Futsal</option>
+                          <option value="Padel" style={{background:'#1a1a1a'}}>Padel</option>
+                          <option value="Cricket" style={{background:'#1a1a1a'}}>Cricket</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: '800', display: 'block', marginBottom: '4px' }}>FLAT BASE RATE</label>
+                        <input type="number" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px', color: 'white', width: '100%', fontSize: '0.8rem' }} placeholder="PKR/hr" value={subCourtInput.pricePerHour} onChange={e => setSubCourtInput({ ...subCourtInput, pricePerHour: e.target.value })} />
+                      </div>
+                    </div>
+
+                    {/* Pricing Toggles */}
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: subCourtInput.hasPeakPricing ? '#f59e0b' : '#9ca3af', fontSize: '0.75rem', fontWeight: '800' }}>
+                        <input type="checkbox" checked={subCourtInput.hasPeakPricing} onChange={e => setSubCourtInput({ ...subCourtInput, hasPeakPricing: e.target.checked })} style={{ accentColor: '#f59e0b' }} />
+                        Enable Custom Peak Hour Surcharge
+                      </label>
+
+                      {subCourtInput.hasPeakPricing && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '6px 10px', color: 'white', width: '70px', fontSize: '0.75rem', textAlign: 'center' }} placeholder="Start" value={subCourtInput.peakStartTime} onChange={e => setSubCourtInput({ ...subCourtInput, peakStartTime: e.target.value })} />
+                          <span style={{ color: '#64748b' }}>to</span>
+                          <input style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '6px 10px', color: 'white', width: '70px', fontSize: '0.75rem', textAlign: 'center' }} placeholder="End" value={subCourtInput.peakEndTime} onChange={e => setSubCourtInput({ ...subCourtInput, peakEndTime: e.target.value })} />
+                          <input type="number" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid #f59e0b', borderRadius: '8px', padding: '6px 10px', color: '#f59e0b', width: '100px', fontSize: '0.75rem', fontWeight: '800' }} placeholder="Peak Rate" value={subCourtInput.pricePeak} onChange={e => setSubCourtInput({ ...subCourtInput, pricePeak: e.target.value })} />
+                        </div>
+                      )}
+
+                      <button type="button" onClick={handleAddSubCourt} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: '800', fontSize: '0.75rem', cursor: 'pointer' }}>
+                        + Add Sub-Court
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '24px', marginBottom: '2.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <h4 style={{ color: '#60a5fa', marginBottom: '1.25rem', marginTop: 0, fontSize: '0.95rem', fontWeight: '800' }}>
-                    âš¡ BASE PRICING PARAMETERS
+                    ★ BASE PRICING PARAMETERS
                   </h4>
                   <div className="form-group">
                     <label style={{ marginBottom: '0.75rem', display: 'block', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>BASE PRICE PER HOUR (PKR)</label>
@@ -967,7 +1095,7 @@ const ManagerDashboard = () => {
                   </div>
 
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
-                    <label style={{ marginBottom: '1rem', display: 'block', color: '#f59e0b', fontWeight: '800', fontSize: '0.85rem' }}>âš¡ DYNAMIC PEAK HOUR TIER CONFIGURATION</label>
+                    <label style={{ marginBottom: '1rem', display: 'block', color: '#f59e0b', fontWeight: '800', fontSize: '0.85rem' }}>★ DYNAMIC PEAK HOUR TIER CONFIGURATION</label>
                     <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                       <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '6px', fontWeight: '800' }}>PEAK RATE (PKR/hr)</label>
                       <input type="number" placeholder="e.g. 6000" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.pricePeak || ''} onChange={e => setEditForm({...editForm, pricePeak: e.target.value})} />

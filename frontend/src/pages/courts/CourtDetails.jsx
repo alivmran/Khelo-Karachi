@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useContext } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import API from '../../api/axios';
 import AuthContext from '../../context/AuthContext';
@@ -13,7 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   UploadCloud,
-  X
+  X,
+  Clock
 } from 'lucide-react';
 
 const to12Hour = (time24 = '00:00') => {
@@ -91,10 +92,9 @@ const CourtDetails = () => {
   }, [court, activeImage]);
 
   const [date, setDate] = useState('');
-  const [facility, setFacility] = useState('');
-  const [selectedSlots, setSelectedSlots] = useState([]);
-  const [activePrice, setActivePrice] = useState(0);
-  const [unavailableSlots, setUnavailableSlots] = useState([]);
+  const [selectedSport, setSelectedSport] = useState('');
+  const [selectedSlotsMap, setSelectedSlotsMap] = useState({});
+  const [unavailableSlotsMap, setUnavailableSlotsMap] = useState({});
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [newBookingIds, setNewBookingIds] = useState([]);
   const [paymentScreenshot, setPaymentScreenshot] = useState(null);
@@ -115,27 +115,44 @@ const CourtDetails = () => {
         const found = data.find(c => c._id === id);
         setCourt(found);
         if (found?.images?.length > 0) setActiveImage(found.images[0]);
-        setFacility(found?.facilities?.[0] || '');
-        setActivePrice(found?.pricePerHour || 0);
+        
+        const availableSports = found?.facilities || ['Futsal'];
+        setSelectedSport(availableSports[0]);
       } catch (error) { console.error(error); }
     };
     fetchCourt();
   }, [id]);
 
-  useEffect(() => {
-    if (date && court && facility) {
-      setActivePrice(court.pricePerHour || 0);
+  const handleSportChange = (sport) => {
+    setSelectedSport(sport);
+    setSelectedSlotsMap({}); // Reset selected slots completely
+  };
 
-      const fetchAvailability = async () => {
-        try {
-          const { data } = await API.get(`/bookings/availability?courtId=${court._id}&date=${date}&facility=${facility}`);
-          setUnavailableSlots(data);
-          setSelectedSlots([]); // Clear when date changes
-        } catch (e) { console.error(e); }
+  useEffect(() => {
+    if (date && court && selectedSport) {
+      const subCourts = court.courtsDetail?.filter(c => c.sport === selectedSport) || [];
+      const facilityNames = subCourts.length > 0 ? subCourts.map(c => c.name) : [selectedSport];
+
+      const fetchAllAvailabilities = async () => {
+        const newUnavailableMap = {};
+        await Promise.all(facilityNames.map(async (facName) => {
+          try {
+            const { data } = await API.get(`/bookings/availability?courtId=${court._id}&date=${date}&facility=${facName}`);
+            newUnavailableMap[facName] = data;
+          } catch (e) {
+            console.error(e);
+            newUnavailableMap[facName] = [];
+          }
+        }));
+        setUnavailableSlotsMap(newUnavailableMap);
+        setSelectedSlotsMap({}); // Keep clear on date change
       };
-      fetchAvailability();
+      fetchAllAvailabilities();
     }
-  }, [date, court, facility]);
+  }, [date, court, selectedSport]);
+
+  const subCourts = court?.courtsDetail?.filter(c => c.sport === selectedSport) || [];
+  const facilityNames = subCourts.length > 0 ? subCourts.map(c => c.name) : [selectedSport];
 
   const calculateTotal = () => {
     if (!court) return 0;
@@ -143,42 +160,53 @@ const CourtDetails = () => {
     const isDiscountActive = court.discount?.percentage > 0 && 
       (!court.discount.validUntil || new Date() <= new Date(court.discount.validUntil));
 
-    for (let slotStr of selectedSlots) {
-      const startH = parseHourHelper(slotStr.split('-')[0]);
-      let base = court.pricePerHour || 0;
-      if (court.pricePeak && court.peakStartTime && court.peakEndTime) {
-        const pHStart = parseHourHelper(court.peakStartTime);
-        const pHEnd = parseHourHelper(court.peakEndTime);
-        if (pHStart !== null && pHEnd !== null && startH >= pHStart && startH < pHEnd) {
-          base = court.pricePeak;
+    facilityNames.forEach(facName => {
+      const slots = selectedSlotsMap[facName] || [];
+      const subCourtObj = court.courtsDetail?.find(c => c.name === facName);
+      const basePrice = subCourtObj ? subCourtObj.pricePerHour : (court.pricePerHour || 0);
+      const usesPeakPricing = subCourtObj ? subCourtObj.hasPeakPricing : true;
+      const customPeakStart = subCourtObj?.hasPeakPricing ? subCourtObj.peakStartTime : court.peakStartTime;
+      const customPeakEnd = subCourtObj?.hasPeakPricing ? subCourtObj.peakEndTime : court.peakEndTime;
+      const customPricePeak = subCourtObj?.hasPeakPricing ? subCourtObj.pricePeak : court.pricePeak;
+
+      slots.forEach(slotStr => {
+        const startH = parseHourHelper(slotStr.split('-')[0]);
+        let currentBase = basePrice;
+        
+        if (usesPeakPricing && customPricePeak && customPeakStart && customPeakEnd) {
+          const pHStart = parseHourHelper(customPeakStart);
+          const pHEnd = parseHourHelper(customPeakEnd);
+          if (pHStart !== null && pHEnd !== null && startH >= pHStart && startH < pHEnd) {
+            currentBase = customPricePeak;
+          }
         }
-      }
-      if (isDiscountActive) {
-        base = Math.round(base * (1 - court.discount.percentage / 100));
-      }
-      sum += base;
-    }
+
+        if (isDiscountActive) {
+          currentBase = Math.round(currentBase * (1 - court.discount.percentage / 100));
+        }
+        sum += currentBase;
+      });
+    });
     return sum;
   };
 
   const calculatedTotalPrice = calculateTotal();
+  const totalSelectedSlotsCount = Object.values(selectedSlotsMap).reduce((acc, arr) => acc + arr.length, 0);
 
   const handleBooking = async (e) => {
     e.preventDefault();
     if (!user) { navigate('/login'); return; }
-    if (selectedSlots.length === 0) {
+    if (totalSelectedSlotsCount === 0) {
       toast.error('Please select at least one time slot');
       return;
     }
-    if (selectedSlots.length < (court?.minSlots || 1)) {
+    if (totalSelectedSlotsCount < (court?.minSlots || 1)) {
       toast.error(`This venue requires a minimum booking of ${court?.minSlots} consecutive hours.`);
       return;
     }
-    if (!facility) {
-      toast.error('Please select a facility');
-      return;
-    }
+
     const groupTimeSlots = (slotsArray) => {
+      if (!slotsArray || slotsArray.length === 0) return [];
       const sorted = [...slotsArray].sort();
       const blocks = [];
       let currentStart = sorted[0].split('-')[0];
@@ -198,12 +226,60 @@ const CourtDetails = () => {
     };
 
     try {
-      const timeBlocks = groupTimeSlots(selectedSlots);
-      const { data } = await API.post('/bookings', { courtId: id, date, facility, timeBlocks, totalPrice: calculatedTotalPrice });
-      setNewBookingIds(data.map((b) => b._id));
+      let allCreatedBookingIds = [];
+
+      const calculateFacilityTotal = (facName, slotsArr) => {
+        let sum = 0;
+        const isDiscountActive = court.discount?.percentage > 0 && 
+          (!court.discount.validUntil || new Date() <= new Date(court.discount.validUntil));
+        const subCourtObj = court.courtsDetail?.find(c => c.name === facName);
+        const basePrice = subCourtObj ? subCourtObj.pricePerHour : (court.pricePerHour || 0);
+        const usesPeakPricing = subCourtObj ? subCourtObj.hasPeakPricing : true;
+        const customPeakStart = subCourtObj?.hasPeakPricing ? subCourtObj.peakStartTime : court.peakStartTime;
+        const customPeakEnd = subCourtObj?.hasPeakPricing ? subCourtObj.peakEndTime : court.peakEndTime;
+        const customPricePeak = subCourtObj?.hasPeakPricing ? subCourtObj.pricePeak : court.pricePeak;
+
+        slotsArr.forEach(slotStr => {
+          const startH = parseHourHelper(slotStr.split('-')[0]);
+          let currentBase = basePrice;
+          if (usesPeakPricing && customPricePeak && customPeakStart && customPeakEnd) {
+            const pHStart = parseHourHelper(customPeakStart);
+            const pHEnd = parseHourHelper(customPeakEnd);
+            if (pHStart !== null && pHEnd !== null && startH >= pHStart && startH < pHEnd) {
+              currentBase = customPricePeak;
+            }
+          }
+          if (isDiscountActive) {
+            currentBase = Math.round(currentBase * (1 - court.discount.percentage / 100));
+          }
+          sum += currentBase;
+        });
+        return sum;
+      };
+
+      // Submit individual entries sequentially per facility to preserve clean API contracts
+      for (let facName of facilityNames) {
+        const slotsForFac = selectedSlotsMap[facName] || [];
+        if (slotsForFac.length > 0) {
+          const timeBlocks = groupTimeSlots(slotsForFac);
+          const facTotal = calculateFacilityTotal(facName, slotsForFac);
+          const { data } = await API.post('/bookings', { 
+            courtId: id, 
+            date, 
+            facility: facName, 
+            timeBlocks, 
+            totalPrice: facTotal 
+          });
+          allCreatedBookingIds.push(...data.map(b => b._id));
+        }
+      }
+
+      setNewBookingIds(allCreatedBookingIds);
       setPaymentModalOpen(true);
-      toast.info('Booking placed. Complete payment proof to move it to pending approval.');
-    } catch (error) { toast.error(error.response?.data?.message || 'Failed'); }
+      toast.info('Booking placed successfully. Please submit payment proof.');
+    } catch (error) { 
+      toast.error(error.response?.data?.message || 'Failed to complete booking'); 
+    }
   };
 
   const handleFileChange = (e) => {
@@ -244,7 +320,6 @@ const CourtDetails = () => {
   };
 
   // --- ADMIN LOGIC ---
-  // If admin, hijack the view to show the Admin Control Panel
   if (user && (user.isAdmin || user.role === 'admin')) {
     return (
       <div className="page-container">
@@ -277,8 +352,12 @@ const CourtDetails = () => {
                 <img src={activeImage} className="main-image" style={{ transition: 'opacity 0.3s ease-in-out' }} />
                 {court.images && court.images.length > 1 && (
                   <>
-                    <button onClick={(e) => { e.preventDefault(); prevImage(); }} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>â®</button>
-                    <button onClick={(e) => { e.preventDefault(); nextImage(); }} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>â¯</button>
+                    <button onClick={(e) => { e.preventDefault(); prevImage(); }} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>
+                      <ChevronLeft size={24} />
+                    </button>
+                    <button onClick={(e) => { e.preventDefault(); nextImage(); }} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>
+                      <ChevronRight size={24} />
+                    </button>
                     <div style={{ position: 'absolute', bottom: '15px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', zIndex: 10, background: 'rgba(0,0,0,0.4)', padding: '6px 12px', borderRadius: '20px' }}>
                       {court.images.map((img, idx) => (
                         <div key={idx} onClick={() => setActiveImage(img)} style={{ width: '10px', height: '10px', borderRadius: '50%', background: activeImage === img ? '#3b82f6' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'background 0.2s' }} />
@@ -292,8 +371,8 @@ const CourtDetails = () => {
 
           <div className="info-box">
             <div style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '12px', padding: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
-              <div style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '10px', borderRadius: '10px', fontSize: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                ðŸ•’
+              <div style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '10px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Clock size={24} color="#60a5fa" />
               </div>
               <div style={{ minWidth: 0 }}>
                 <h4 style={{ margin: 0, color: '#60a5fa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '3px' }}>Operating Hours</h4>
@@ -336,13 +415,13 @@ const CourtDetails = () => {
             )}
             {court.reviews && court.reviews.length > 0 && (
               <div style={{ marginTop: '2rem' }}>
-                <h3>Reviews ({court.numReviews}) - {court.rating?.toFixed(1)} â­</h3>
+                <h3>Reviews ({court.numReviews}) - {court.rating?.toFixed(1)} ★</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
                   {court.reviews.map(r => (
                     <div key={r._id} style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', border: '1px solid #333' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <strong>{r.name}</strong>
-                        <span style={{ color: '#facc15' }}>{'â­'.repeat(r.rating)}</span>
+                        <span style={{ color: '#facc15' }}>{'★'.repeat(r.rating)}</span>
                       </div>
                       <p style={{ margin: 0, color: '#ddd', fontSize: '0.9rem' }}>{r.comment}</p>
                       <small style={{ color: '#888', display: 'block', marginTop: '8px' }}>{new Date(r.createdAt).toLocaleDateString()}</small>
@@ -361,24 +440,36 @@ const CourtDetails = () => {
                 <div className="book-slot-header">
                   <h3>Book Slot</h3>
                   <div className="price-display">
-                    PKR {selectedSlots.length > 0 ? calculatedTotalPrice : (court?.pricePerHour || 0)} 
-                    <span>{selectedSlots.length > 0 ? ' / total' : ' / base hr'}</span>
+                    PKR {totalSelectedSlotsCount > 0 ? calculatedTotalPrice : court?.pricePerHour} 
+                    <span>{totalSelectedSlotsCount > 0 ? ' / total' : ' / base hr'}</span>
                   </div>
                   {court?.minSlots >= 2 && (
                     <div style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#f59e0b', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      âš¡ Minimum Booking: {court.minSlots} consecutive hours
+                      ★ Minimum Booking: {court.minSlots} consecutive hours
                     </div>
                   )}
                 </div>
                 <form onSubmit={handleBooking}>
-                  <div className="form-group">
-                    <label>Select Facility</label>
-                    <select value={facility} onChange={e => setFacility(e.target.value)} required>
+                  {/* STEP 1: Select Facility/Sport Type */}
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label style={{ color: '#9ca3af', fontWeight: '800', fontSize: '0.75rem', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>
+                      Step 1: Select Sport Facility
+                    </label>
+                    <select 
+                      style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: '#60a5fa', fontWeight: '800', width: '100%', fontSize: '0.85rem' }} 
+                      value={selectedSport} 
+                      onChange={e => handleSportChange(e.target.value)} 
+                      required
+                    >
                       {(court.facilities || []).map((f) => <option key={f} value={f}>{f}</option>)}
                     </select>
                   </div>
-                  <div className="form-group">
-                    <label>Date <span style={{fontSize:'0.75rem', color:'#aaa', fontWeight:'normal'}}>(Max 4 weeks ahead)</span></label>
+
+                  {/* STEP 2: Choose Booking Date */}
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ color: '#9ca3af', fontWeight: '800', fontSize: '0.75rem', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>
+                      Step 2: Choose Booking Date
+                    </label>
                     <input 
                       type="date" 
                       min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]} 
@@ -388,21 +479,51 @@ const CourtDetails = () => {
                       required 
                     />
                   </div>
-                  {date && (
-                    <div className="form-group">
-                      <label>Select Time Slots</label>
-                      <TimeSlotPicker
-                        selectedSlots={selectedSlots}
-                        onChange={setSelectedSlots}
-                        unavailableSlots={unavailableSlots}
-                        startHour={parseHour(court.operationalStartTime, 0)}
-                        endHour={parseHour(court.operationalEndTime, 24)}
-                        selectedDate={date}
-                        court={court}
-                      />
+
+                  {/* SIMULTANEOUS SUB-COURTS DISPLAY */}
+                  {date ? (
+                    <div style={{ marginTop: '1.5rem' }}>
+                      <h4 style={{ color: '#facc15', fontSize: '0.85rem', fontWeight: '900', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.5px' }}>
+                        ★ Available Sub-Courts & Time Slots
+                      </h4>
+                      {facilityNames.map((facName) => {
+                        const subCourtObj = court.courtsDetail?.find(c => c.name === facName);
+                        const baseRate = subCourtObj ? subCourtObj.pricePerHour : (court.pricePerHour || 0);
+                        const hasPeak = subCourtObj ? (subCourtObj.hasPeakPricing && subCourtObj.pricePeak) : false;
+                        
+                        return (
+                          <div key={facName} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '16px', marginBottom: '1.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px', marginBottom: '12px' }}>
+                              <h5 style={{ margin: 0, color: 'white', fontSize: '1.05rem', fontWeight: '800' }}>{facName}</h5>
+                              <span style={{ fontSize: '0.75rem', color: '#9ca3af', background: 'rgba(0,0,0,0.3)', padding: '4px 10px', borderRadius: '8px', fontWeight: '700' }}>
+                                Base: PKR {baseRate}/hr {hasPeak ? `| Peak: PKR ${subCourtObj.pricePeak}/hr` : '| Flat Rate'}
+                              </span>
+                            </div>
+                            <TimeSlotPicker
+                              selectedSlots={selectedSlotsMap[facName] || []}
+                              onChange={(newSlots) => {
+                                setSelectedSlotsMap({ [facName]: newSlots });
+                              }}
+                              unavailableSlots={unavailableSlotsMap[facName] || []}
+                              startHour={parseHour(court.operationalStartTime, 0)}
+                              endHour={parseHour(court.operationalEndTime, 24)}
+                              selectedDate={date}
+                              court={court}
+                              selectedFacility={facName}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px dashed rgba(59, 130, 246, 0.2)', padding: '24px', borderRadius: '16px', textAlign: 'center', marginTop: '1rem', color: '#9ca3af', fontSize: '0.85rem' }}>
+                      Please select a Date above to view all corresponding sub-courts and available timeslots simultaneously.
                     </div>
                   )}
-                  <button type="submit" className="book-btn large confirm-btn-styled" disabled={selectedSlots.length === 0}>Confirm Booking</button>
+
+                  <button type="submit" className="book-btn large confirm-btn-styled" disabled={totalSelectedSlotsCount === 0} style={{ marginTop: '1rem' }}>
+                    Confirm Booking ({totalSelectedSlotsCount} slot{totalSelectedSlotsCount !== 1 ? 's' : ''})
+                  </button>
                 </form>
               </div>
             ) : (

@@ -46,6 +46,7 @@ router.post('/create-court', protect, admin, upload.array('images', 5), async (r
       courtName,
       location,
       facilities,
+      courtsDetail,
       amenities,
       googleMapLink,
       paymentBank,
@@ -82,6 +83,21 @@ router.post('/create-court', protect, admin, upload.array('images', 5), async (r
         throw new Error(`Manager email '${managerEmail}' is already in use.`);
     }
 
+    let parsedCourtsDetail = [];
+    if (courtsDetail) {
+      try {
+        parsedCourtsDetail = typeof courtsDetail === 'string' ? JSON.parse(courtsDetail) : courtsDetail;
+      } catch (e) {
+        console.error('Failed to parse courtsDetail JSON string:', e);
+      }
+    }
+
+    let finalFacilities = Array.isArray(facilities) ? facilities : (facilities ? [facilities] : []);
+    if (parsedCourtsDetail && parsedCourtsDetail.length > 0) {
+      const derivedSports = parsedCourtsDetail.map(c => c.sport).filter(Boolean);
+      finalFacilities = [...new Set([...finalFacilities, ...derivedSports])];
+    }
+
     const password = `${courtName.replace(/\s+/g, '')}123`;
 
     // Create Manager
@@ -96,7 +112,8 @@ router.post('/create-court', protect, admin, upload.array('images', 5), async (r
     const court = await Court.create({
         name: courtName,
         location,
-        facilities: Array.isArray(facilities) ? facilities : (facilities ? [facilities] : []),
+        facilities: finalFacilities,
+        courtsDetail: parsedCourtsDetail,
         amenities: Array.isArray(amenities) ? amenities : (amenities ? [amenities] : []),
         googleMapLink,
         paymentBank,
@@ -105,7 +122,7 @@ router.post('/create-court', protect, admin, upload.array('images', 5), async (r
         advanceRequired: advanceRequired || 0,
         operationalStartTime: operationalStartTime || '00:00',
         operationalEndTime: operationalEndTime || '24:00',
-        pricePerHour,
+        pricePerHour: Number(pricePerHour) || 0,
         minSlots: Number(minSlots) || 1,
         discount: {
           percentage: Number(discountPercentage) || 0,
@@ -212,6 +229,17 @@ router.put('/court/:id', protect, admin, upload.array('images', 5), async (req, 
         const updateData = { ...req.body };
         if (req.body.facilities) {
           updateData.facilities = Array.isArray(req.body.facilities) ? req.body.facilities : [req.body.facilities];
+        }
+        if (req.body.courtsDetail) {
+          try {
+            updateData.courtsDetail = typeof req.body.courtsDetail === 'string' ? JSON.parse(req.body.courtsDetail) : req.body.courtsDetail;
+            if (Array.isArray(updateData.courtsDetail) && updateData.courtsDetail.length > 0) {
+              const derivedSports = updateData.courtsDetail.map(c => c.sport).filter(Boolean);
+              updateData.facilities = [...new Set([...(updateData.facilities || []), ...derivedSports])];
+            }
+          } catch (e) {
+            console.error('Failed to parse courtsDetail in PUT:', e);
+          }
         }
         if (req.body.amenities) {
           updateData.amenities = Array.isArray(req.body.amenities) ? req.body.amenities : [req.body.amenities];

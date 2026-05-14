@@ -5,7 +5,6 @@ const bookingSchema = mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, 
   facility: {
     type: String,
-    enum: ['Padel', 'Futsal', 'Cricket'],
     required: true
   },
   date: { type: String, required: true },
