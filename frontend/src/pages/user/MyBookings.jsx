@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import API from '../api/axios';
+﻿import { useEffect, useState } from 'react';
+import API from '../../api/axios';
 import { toast } from 'react-toastify';
 
 const MyBookings = () => {
@@ -197,8 +197,8 @@ const MyBookings = () => {
                   <span className={`status ${b.status.toLowerCase()}`} style={{flexShrink:0, fontSize:'0.75rem'}}>{b.status}</span>
                 </div>
                 <div style={{display:'flex', gap:'12px', fontSize:'0.85rem', color:'#aaa', marginBottom:'10px'}}>
-                  <span>📅 {b.date}</span>
-                  <span>⏰ {b.startTime} - {b.endTime}</span>
+                  <span>ðŸ“… {b.date}</span>
+                  <span>â° {b.startTime} - {b.endTime}</span>
                 </div>
                 <div style={{display:'grid', gap:'6px'}}>
                   {['Pending', 'Awaiting Payment'].includes(b.status) && (

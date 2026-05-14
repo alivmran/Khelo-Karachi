@@ -1,10 +1,10 @@
-import { useEffect, useState, useContext } from 'react';
+﻿import { useEffect, useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import API from '../api/axios';
-import AuthContext from '../context/AuthContext';
+import API from '../../api/axios';
+import AuthContext from '../../context/AuthContext';
 import { toast } from 'react-toastify';
-import AdminCourtView from './AdminCourtView';
-import TimeSlotPicker from '../components/TimeSlotPicker';
+import AdminCourtView from '../admin/AdminCourtView';
+import TimeSlotPicker from '../../components/TimeSlotPicker';
 import { 
   Trophy, 
   MapPin, 
@@ -277,8 +277,8 @@ const CourtDetails = () => {
                 <img src={activeImage} className="main-image" style={{ transition: 'opacity 0.3s ease-in-out' }} />
                 {court.images && court.images.length > 1 && (
                   <>
-                    <button onClick={(e) => { e.preventDefault(); prevImage(); }} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>❮</button>
-                    <button onClick={(e) => { e.preventDefault(); nextImage(); }} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>❯</button>
+                    <button onClick={(e) => { e.preventDefault(); prevImage(); }} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>â®</button>
+                    <button onClick={(e) => { e.preventDefault(); nextImage(); }} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>â¯</button>
                     <div style={{ position: 'absolute', bottom: '15px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', zIndex: 10, background: 'rgba(0,0,0,0.4)', padding: '6px 12px', borderRadius: '20px' }}>
                       {court.images.map((img, idx) => (
                         <div key={idx} onClick={() => setActiveImage(img)} style={{ width: '10px', height: '10px', borderRadius: '50%', background: activeImage === img ? '#3b82f6' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'background 0.2s' }} />
@@ -293,7 +293,7 @@ const CourtDetails = () => {
           <div className="info-box">
             <div style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '12px', padding: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
               <div style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '10px', borderRadius: '10px', fontSize: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                🕒
+                ðŸ•’
               </div>
               <div style={{ minWidth: 0 }}>
                 <h4 style={{ margin: 0, color: '#60a5fa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '3px' }}>Operating Hours</h4>
@@ -336,13 +336,13 @@ const CourtDetails = () => {
             )}
             {court.reviews && court.reviews.length > 0 && (
               <div style={{ marginTop: '2rem' }}>
-                <h3>Reviews ({court.numReviews}) - {court.rating?.toFixed(1)} ⭐</h3>
+                <h3>Reviews ({court.numReviews}) - {court.rating?.toFixed(1)} â­</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
                   {court.reviews.map(r => (
                     <div key={r._id} style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', border: '1px solid #333' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <strong>{r.name}</strong>
-                        <span style={{ color: '#facc15' }}>{'⭐'.repeat(r.rating)}</span>
+                        <span style={{ color: '#facc15' }}>{'â­'.repeat(r.rating)}</span>
                       </div>
                       <p style={{ margin: 0, color: '#ddd', fontSize: '0.9rem' }}>{r.comment}</p>
                       <small style={{ color: '#888', display: 'block', marginTop: '8px' }}>{new Date(r.createdAt).toLocaleDateString()}</small>
@@ -366,7 +366,7 @@ const CourtDetails = () => {
                   </div>
                   {court?.minSlots >= 2 && (
                     <div style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#f59e0b', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      ⚡ Minimum Booking: {court.minSlots} consecutive hours
+                      âš¡ Minimum Booking: {court.minSlots} consecutive hours
                     </div>
                   )}
                 </div>

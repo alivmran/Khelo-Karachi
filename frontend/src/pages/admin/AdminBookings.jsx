@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import API from '../api/axios';
+﻿import { useEffect, useState } from 'react';
+import API from '../../api/axios';
 import { toast } from 'react-toastify';
 
 const AdminBookings = () => {
@@ -103,8 +103,8 @@ const AdminBookings = () => {
                             <td>
                                 {b.status === 'Pending' && (
                                     <div style={{display:'flex', gap:'5px'}}>
-                                        <button onClick={() => handleStatusUpdate(b._id, 'Approved')} style={{background:'#10b981', border:'none', color:'white', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>✓</button>
-                                        <button onClick={() => handleStatusUpdate(b._id, 'Rejected')} style={{background:'#ef4444', border:'none', color:'white', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>✕</button>
+                                        <button onClick={() => handleStatusUpdate(b._id, 'Approved')} style={{background:'#10b981', border:'none', color:'white', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>âœ“</button>
+                                        <button onClick={() => handleStatusUpdate(b._id, 'Rejected')} style={{background:'#ef4444', border:'none', color:'white', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>âœ•</button>
                                     </div>
                                 )}
                             </td>

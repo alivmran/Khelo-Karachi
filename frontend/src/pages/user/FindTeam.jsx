@@ -1,7 +1,7 @@
-import { useEffect, useState, useContext } from 'react';
+﻿import { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import API from '../api/axios';
-import AuthContext from '../context/AuthContext';
+import API from '../../api/axios';
+import AuthContext from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { 
   Users, 
@@ -255,7 +255,7 @@ const FindTeam = () => {
       {showModal && (
         <div className="modal-overlay" style={{ backdropFilter: 'blur(12px)', background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div className="modal-content" style={{ borderRadius: '28px', padding: '2.5rem', border: '1px solid rgba(255,255,255,0.1)', background: 'linear-gradient(145deg, #121212 0%, #0a0a0a 100%)', maxWidth: '600px', width: '100%', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-            <button className="close-modal" onClick={() => setShowModal(false)} style={{ top: '1.5rem', right: '1.5rem', fontSize: '1.5rem', color: '#6b7280', background: 'transparent', border: 'none', cursor: 'pointer' }}>×</button>
+            <button className="close-modal" onClick={() => setShowModal(false)} style={{ top: '1.5rem', right: '1.5rem', fontSize: '1.5rem', color: '#6b7280', background: 'transparent', border: 'none', cursor: 'pointer' }}>Ã—</button>
             
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ fontSize: '1.75rem', fontWeight: '800', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white' }}>

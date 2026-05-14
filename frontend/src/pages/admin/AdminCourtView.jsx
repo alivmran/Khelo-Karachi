@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import API from '../api/axios';
+import API from '../../api/axios';
 import { toast } from 'react-toastify';
-import TimeSlotPicker from '../components/TimeSlotPicker';
+import TimeSlotPicker from '../../components/TimeSlotPicker';
 import { 
   BarChart3, 
   Calendar, 
@@ -413,7 +413,7 @@ const AdminCourtView = ({ courtId }) => {
 
                       <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '24px', marginBottom: '2.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <h4 style={{ color: '#60a5fa', marginBottom: '1.25rem', marginTop: 0, fontSize: '0.95rem', fontWeight: '800' }}>
-                          ⚡ PRICING & OPERATIONAL CONSTRAINTS
+                          âš¡ PRICING & OPERATIONAL CONSTRAINTS
                         </h4>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
                           <div className="form-group">
@@ -427,7 +427,7 @@ const AdminCourtView = ({ courtId }) => {
                         </div>
 
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.25rem', marginBottom: '1.5rem' }}>
-                          <label style={{ marginBottom: '1rem', display: 'block', color: '#ec4899', fontWeight: '800', fontSize: '0.85rem' }}>🏷️ PROMOTIONAL CAMPAIGN CONTROL</label>
+                          <label style={{ marginBottom: '1rem', display: 'block', color: '#ec4899', fontWeight: '800', fontSize: '0.85rem' }}>ðŸ·ï¸ PROMOTIONAL CAMPAIGN CONTROL</label>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
                             <div className="form-group">
                               <label style={{ marginBottom: '0.75rem', display: 'block', color: '#9ca3af', fontWeight: '700', fontSize: '0.85rem' }}>DISCOUNT PERCENTAGE (%)</label>
@@ -449,7 +449,7 @@ const AdminCourtView = ({ courtId }) => {
                         </div>
 
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.25rem' }}>
-                          <label style={{ marginBottom: '1rem', display: 'block', color: '#f59e0b', fontWeight: '800', fontSize: '0.85rem' }}>⚡ DYNAMIC PEAK HOUR TIER CONFIGURATION</label>
+                          <label style={{ marginBottom: '1rem', display: 'block', color: '#f59e0b', fontWeight: '800', fontSize: '0.85rem' }}>âš¡ DYNAMIC PEAK HOUR TIER CONFIGURATION</label>
                           <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                             <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '6px', fontWeight: '800' }}>PEAK RATE (PKR/hr)</label>
                             <input type="number" placeholder="e.g. 6000" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', width: '100%' }} value={editForm.pricePeak || ''} onChange={e=>setEditForm({...editForm, pricePeak:e.target.value})} />

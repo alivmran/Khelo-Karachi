@@ -1,8 +1,8 @@
-import { useState, useContext } from 'react';
+﻿import { useState, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import API from '../api/axios';
+import API from '../../api/axios';
 import { toast } from 'react-toastify';
-import AuthContext from '../context/AuthContext';
+import AuthContext from '../../context/AuthContext';
 import { ShieldCheck, Mail, ArrowRight, RefreshCw } from 'lucide-react';
 
 const VerifyEmail = () => {
@@ -109,3 +109,4 @@ const VerifyEmail = () => {
 };
 
 export default VerifyEmail;
+

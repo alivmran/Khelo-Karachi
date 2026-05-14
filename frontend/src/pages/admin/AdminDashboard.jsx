@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import API from '../api/axios';
+﻿import { useEffect, useState } from 'react';
+import API from '../../api/axios';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -335,7 +335,7 @@ const AdminDashboard = () => {
 
                 {/* Peak Pricing Configuration */}
                 <div style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '1.25rem', marginBottom: '1.5rem' }}>
-                  <label style={{ color: '#f59e0b', fontSize: '0.75rem', fontWeight: '900', display: 'block', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>⚡ Dynamic Peak Hour Configurations</label>
+                  <label style={{ color: '#f59e0b', fontSize: '0.75rem', fontWeight: '900', display: 'block', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>âš¡ Dynamic Peak Hour Configurations</label>
                   <div className="form-group" style={{ marginBottom: '1rem' }}>
                     <label style={{ color: '#9ca3af', fontSize: '0.75rem', fontWeight: '700', marginBottom: '6px', display: 'block' }}>PEAK RATE (PKR/hr)</label>
                     <input type="number" placeholder="e.g. 5000 (Optional)" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '12px', color: 'white', width: '100%' }} value={form.pricePeak} onChange={e => setForm({ ...form, pricePeak: e.target.value })} />
@@ -386,7 +386,7 @@ const AdminDashboard = () => {
 
                 {/* Promotional Campaign Options */}
                 <div style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '1.25rem' }}>
-                  <label style={{ color: '#ec4899', fontSize: '0.75rem', fontWeight: '900', display: 'block', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>🏷️ Launch Promotion Discounts</label>
+                  <label style={{ color: '#ec4899', fontSize: '0.75rem', fontWeight: '900', display: 'block', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>ðŸ·ï¸ Launch Promotion Discounts</label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                     <div className="form-group">
                       <label style={{ color: '#9ca3af', fontSize: '0.75rem', fontWeight: '700', marginBottom: '6px', display: 'block' }}>DISCOUNT PERCENTAGE (%)</label>
