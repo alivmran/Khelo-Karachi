@@ -330,10 +330,26 @@ router.put('/:id/submit-payment-proof', protect, upload.single('paymentScreensho
 // @access  User
 router.get('/mybookings', protect, async (req, res, next) => {
   try {
-    const bookings = await Booking.find({ user: req.user._id })
-        .populate('court', 'name facilities location')
-        .sort({ date: -1 })
-        .lean(); // Returns raw JS objects avoiding Mongoose document wrapping overhead
+    const page = parseInt(req.query.page);
+    const limit = parseInt(req.query.limit) || 6;
+
+    const query = Booking.find({ user: req.user._id })
+      .populate('court', 'name facilities location')
+      .sort({ date: -1 })
+      .lean();
+
+    if (page && !Number.isNaN(page)) {
+      const total = await Booking.countDocuments({ user: req.user._id });
+      const bookings = await query.skip((page - 1) * limit).limit(limit);
+      return res.json({
+        bookings,
+        page,
+        pages: Math.ceil(total / limit) || 1,
+        total
+      });
+    }
+
+    const bookings = await query;
     res.json(bookings);
   } catch (error) {
     next(error);

@@ -182,7 +182,7 @@ router.get('/posts', async (req, res, next) => {
 // @access  Private
 router.get('/history', protect, async (req, res, next) => {
   try {
-    await runMatchCleanup();
+    runMatchCleanup().catch(e => console.error('Cleanup error:', e));
     // --- BACKGROUND CLEANUP ---
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     MatchPost.deleteMany({ date: { $lt: thirtyDaysAgo } }).exec().catch(e => console.error('Cleanup error:', e));
@@ -191,15 +191,41 @@ router.get('/history', protect, async (req, res, next) => {
     const hosted = await MatchPost.find({ user: req.user._id, status: 'Closed' })
       .populate('court', 'name facilities location')
       .populate('challengerUser', 'name')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     const requests = await Request.find({ sender: req.user._id, status: 'ACCEPTED' })
       .populate({
         path: 'matchPost',
         populate: { path: 'court', select: 'name facilities location' }
-      }).sort({ createdAt: -1 });
+      })
+      .sort({ createdAt: -1 })
+      .lean();
 
     const challenged = requests.map(r => r.matchPost).filter(Boolean);
+
+    const page = parseInt(req.query.page);
+    const limit = parseInt(req.query.limit) || 6;
+
+    if (page && !Number.isNaN(page)) {
+      const hostedMatches = hosted.map(m => ({ ...m, isHost: true }));
+      const challengedMatches = challenged.map(m => ({ ...m, isHost: false }));
+      const allMatches = [...hostedMatches, ...challengedMatches].sort((a, b) => {
+        const dateA = new Date(`${a.date}T${a.startTime || '00:00'}`);
+        const dateB = new Date(`${b.date}T${b.startTime || '00:00'}`);
+        return dateB - dateA;
+      });
+
+      const total = allMatches.length;
+      const matches = allMatches.slice((page - 1) * limit, page * limit);
+
+      return res.json({
+        matches,
+        page,
+        pages: Math.ceil(total / limit) || 1,
+        total
+      });
+    }
 
     res.json({ hosted, challenged });
   } catch (error) {

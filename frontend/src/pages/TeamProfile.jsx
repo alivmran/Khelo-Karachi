@@ -29,7 +29,13 @@ const TeamProfile = () => {
   const [showMatchHistory, setShowMatchHistory] = useState(true);
   const [profile, setProfile] = useState(null);
   const [bookings, setBookings] = useState([]);
-  const [matchHistory, setMatchHistory] = useState({ hosted: [], challenged: [] });
+  const [bookingPage, setBookingPage] = useState(1);
+  const [bookingPages, setBookingPages] = useState(1);
+
+  const [allMatches, setAllMatches] = useState([]);
+  const [matchPage, setMatchPage] = useState(1);
+  const [matchPages, setMatchPages] = useState(1);
+
   const [disputeReasonByBooking, setDisputeReasonByBooking] = useState({});
   const [refundModalBooking, setRefundModalBooking] = useState(null);
   const [refundForm, setRefundForm] = useState({
@@ -43,32 +49,66 @@ const TeamProfile = () => {
   const [paymentScreenshot, setPaymentScreenshot] = useState(null);
   const [screenshotPreview, setScreenshotPreview] = useState('');
   
-  const fetchData = async () => {
+  const fetchBookings = async (p = bookingPage) => {
     try {
-      const [bookingRes, matchRes, profileRes] = await Promise.all([
-        API.get('/bookings/mybookings'),
-        API.get('/matches/history'),
-        API.get('/users/profile')
-      ]);
-      
-      setBookings(bookingRes.data);
-      setMatchHistory(matchRes.data);
-      setProfile(profileRes.data);
+      const { data } = await API.get(`/bookings/mybookings?page=${p}&limit=6`);
+      if (data && data.bookings) {
+        setBookings(data.bookings);
+        setBookingPages(data.pages);
+      } else if (Array.isArray(data)) {
+        setBookings(data);
+        setBookingPages(1);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const fetchMatchHistory = async (p = matchPage) => {
+    try {
+      const { data } = await API.get(`/matches/history?page=${p}&limit=6`);
+      if (data && data.matches) {
+        setAllMatches(data.matches);
+        setMatchPages(data.pages);
+      } else if (data) {
+        const h = (data.hosted || []).map(m => ({...m, isHost: true}));
+        const c = (data.challenged || []).map(m => ({...m, isHost: false}));
+        setAllMatches([...h, ...c]);
+        setMatchPages(1);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const fetchProfile = async () => {
+    try {
+      const { data } = await API.get('/users/profile');
+      setProfile(data);
     } catch (error) {
       console.error(error);
     }
   };
 
   useEffect(() => {
-    fetchData();
-    window.addEventListener('refreshBookings', fetchData);
-    return () => window.removeEventListener('refreshBookings', fetchData);
+    fetchProfile();
+    window.addEventListener('refreshBookings', fetchProfile);
+    return () => window.removeEventListener('refreshBookings', fetchProfile);
   }, []);
 
-  const allMatches = [
-    ...matchHistory.hosted.map(m => ({...m, isHost: true})), 
-    ...matchHistory.challenged.map(m => ({...m, isHost: false}))
-  ];
+  useEffect(() => {
+    fetchBookings(bookingPage);
+    const handleB = () => fetchBookings(bookingPage);
+    window.addEventListener('refreshBookings', handleB);
+    return () => window.removeEventListener('refreshBookings', handleB);
+  }, [bookingPage]);
+
+  useEffect(() => {
+    fetchMatchHistory(matchPage);
+    const handleM = () => fetchMatchHistory(matchPage);
+    window.addEventListener('refreshBookings', handleM);
+    return () => window.removeEventListener('refreshBookings', handleM);
+  }, [matchPage]);
   const todayStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
   const threeMonthsAgoDate = new Date();
   threeMonthsAgoDate.setMonth(threeMonthsAgoDate.getMonth() - 3);
@@ -79,8 +119,8 @@ const TeamProfile = () => {
     if(window.confirm('Are you sure you want to cancel this booking request?')) {
         try {
             await API.delete(`/bookings/${id}`);
-            setBookings(bookings.filter(b => b._id !== id));
             toast.success('Booking request cancelled.');
+            fetchBookings(bookingPage);
         } catch(error) {
             toast.error('Failed to cancel booking.');
         }
@@ -91,8 +131,7 @@ const TeamProfile = () => {
     try {
       await API.put(`/matches/${matchId}/report-attendance`, { challengerAttended });
       toast.success('Attendance reported');
-      const matchRes = await API.get('/matches/history');
-      setMatchHistory(matchRes.data);
+      fetchMatchHistory(matchPage);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to report attendance');
     }
@@ -107,8 +146,7 @@ const TeamProfile = () => {
     try {
       await API.put(`/bookings/${bookingId}/verify-refund`, { received: false, disputeReason });
       toast.success('Refund marked as disputed.');
-      const bookingRes = await API.get('/bookings/mybookings');
-      setBookings(bookingRes.data);
+      fetchBookings(bookingPage);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to dispute refund.');
     }
@@ -118,8 +156,7 @@ const TeamProfile = () => {
     try {
       await API.put(`/bookings/${bookingId}/verify-refund`, { received: true });
       toast.success('Refund accepted successfully.');
-      const bookingRes = await API.get('/bookings/mybookings');
-      setBookings(bookingRes.data);
+      fetchBookings(bookingPage);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to accept refund.');
     }
@@ -143,8 +180,7 @@ const TeamProfile = () => {
       await API.put(`/bookings/${refundModalBooking._id}/supply-refund-info`, refundForm);
       toast.success('Refund details submitted to manager.');
       setRefundModalBooking(null);
-      const bookingRes = await API.get('/bookings/mybookings');
-      setBookings(bookingRes.data);
+      fetchBookings(bookingPage);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to submit refund details');
     }
@@ -177,8 +213,7 @@ const TeamProfile = () => {
       toast.success('Payment proof submitted.');
       setPaymentModalBooking(null);
       removeScreenshot();
-      const bookingRes = await API.get('/bookings/mybookings');
-      setBookings(bookingRes.data);
+      fetchBookings(bookingPage);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to submit payment proof');
     }
@@ -388,6 +423,27 @@ const TeamProfile = () => {
                 ))}
               </div>
             )}
+            {bookingPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginTop: '2rem' }}>
+                <button 
+                  disabled={bookingPage === 1}
+                  onClick={() => setBookingPage(p => p - 1)}
+                  style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'white', fontWeight: '800', cursor: bookingPage === 1 ? 'not-allowed' : 'pointer', opacity: bookingPage === 1 ? 0.4 : 1, transition: 'all 0.2s' }}
+                >
+                  Previous
+                </button>
+                <span style={{ color: '#9ca3af', fontSize: '0.9rem', fontWeight: '700' }}>
+                  Page {bookingPage} of {bookingPages}
+                </span>
+                <button 
+                  disabled={bookingPage === bookingPages}
+                  onClick={() => setBookingPage(p => p + 1)}
+                  style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'white', fontWeight: '800', cursor: bookingPage === bookingPages ? 'not-allowed' : 'pointer', opacity: bookingPage === bookingPages ? 0.4 : 1, transition: 'all 0.2s' }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -486,6 +542,27 @@ const TeamProfile = () => {
                     })()}
                   </div>
                 ))}
+              </div>
+            )}
+            {matchPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginTop: '2rem' }}>
+                <button 
+                  disabled={matchPage === 1}
+                  onClick={() => setMatchPage(p => p - 1)}
+                  style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'white', fontWeight: '800', cursor: matchPage === 1 ? 'not-allowed' : 'pointer', opacity: matchPage === 1 ? 0.4 : 1, transition: 'all 0.2s' }}
+                >
+                  Previous
+                </button>
+                <span style={{ color: '#9ca3af', fontSize: '0.9rem', fontWeight: '700' }}>
+                  Page {matchPage} of {matchPages}
+                </span>
+                <button 
+                  disabled={matchPage === matchPages}
+                  onClick={() => setMatchPage(p => p + 1)}
+                  style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'white', fontWeight: '800', cursor: matchPage === matchPages ? 'not-allowed' : 'pointer', opacity: matchPage === matchPages ? 0.4 : 1, transition: 'all 0.2s' }}
+                >
+                  Next
+                </button>
               </div>
             )}
           </>
